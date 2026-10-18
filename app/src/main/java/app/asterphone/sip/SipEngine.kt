@@ -2,6 +2,8 @@ package app.asterphone.sip
 
 import android.annotation.SuppressLint
 import android.content.Context
+import android.os.Handler
+import android.os.Looper
 import android.os.SystemClock
 import androidx.annotation.MainThread
 import androidx.core.content.edit
@@ -61,6 +63,7 @@ object SipEngine {
     private const val KEY_DIAL_ACCOUNT = "dial_account"
     private val AUDIO_CODECS = setOf("PCMU", "PCMA", "telephone-event")
     private val FINISHED = setOf(Call.State.End, Call.State.Error, Call.State.Released)
+    private const val PAUSED_RETRY_MILLIS = 60 * 60 * 1000L
 
     // Only ever the application context, which lives as long as the process.
     @SuppressLint("StaticFieldLeak")
@@ -69,6 +72,11 @@ object SipEngine {
     private var applied: List<SipAccount>? = null
     private val linked = mutableMapOf<String, Account>()
     private val failures = mutableMapOf<String, String>()
+    // Accounts whose password the server refused. They stop registering until something may have changed,
+    // because retrying every minute keeps the phone awake for nothing.
+    private val paused = mutableSetOf<String>()
+    private val handler = Handler(Looper.getMainLooper())
+    private val retryPaused = Runnable { resumePaused() }
     private var connectedAt: Long? = null
     private var endReason: String? = null
     // The call shown in the UI, tracked from callbacks so it is known before the Core lists it.
@@ -124,6 +132,7 @@ object SipEngine {
      */
     private fun onNetworkChanged() {
         if (linked.isEmpty()) return
+        resumePaused()
         if (core.callsNb == 0) {
             // Rebuilds the SIP sockets on the new network and registers again from there.
             core.isNetworkReachable = false
@@ -166,6 +175,7 @@ object SipEngine {
         core.clearAllAuthInfo()
         linked.clear()
         failures.clear()
+        paused.clear()
         val factory = Factory.instance()
         for (account in list.filter { it.enabled }) {
             val identity = factory.createAddress(account.identityUri())
@@ -219,10 +229,33 @@ object SipEngine {
         if (list.any { it.enabled }) KeepAliveService.start(context) else KeepAliveService.stop(context)
     }
 
-    /** Sends REGISTER again for every account. */
+    /** Sends REGISTER again for every account, including those paused after a refused password. */
     @MainThread
     fun refreshRegistrations() {
-        if (::core.isInitialized) core.refreshRegisters()
+        if (!::core.isInitialized) return
+        // Paused accounts register on their own once resumed.
+        val resumed = paused.toSet()
+        resumePaused()
+        linked.filterKeys { it !in resumed }.values.forEach { it.refreshRegister() }
+    }
+
+    /** Stops registering [id] after the server refused its password; Linphone would otherwise retry every minute. */
+    private fun pause(id: String, account: Account) {
+        if (!paused.add(id)) return
+        account.params = account.params.clone().apply { isRegisterEnabled = false }
+        handler.removeCallbacks(retryPaused)
+        handler.postDelayed(retryPaused, PAUSED_RETRY_MILLIS)
+    }
+
+    private fun resumePaused() {
+        handler.removeCallbacks(retryPaused)
+        if (paused.isEmpty()) return
+        val ids = paused.toList()
+        paused.clear()
+        for (id in ids) {
+            val account = linked[id] ?: continue
+            account.params = account.params.clone().apply { isRegisterEnabled = true }
+        }
     }
 
     /** Starts a call and returns null, or returns a message explaining why it couldn't start. */
@@ -305,7 +338,14 @@ object SipEngine {
     private val listener = object : CoreListenerStub() {
         override fun onAccountRegistrationStateChanged(core: Core, account: Account, state: RegistrationState?, message: String) {
             val id = idOf(account) ?: return
-            if (state == RegistrationState.Failed) failures[id] = describeFailure(account, message) else failures.remove(id)
+            when {
+                state == RegistrationState.Failed -> {
+                    failures[id] = describeFailure(account, message)
+                    if (account.error == Reason.Unauthorized) pause(id, account)
+                }
+                // Keep showing why a paused account isn't registered.
+                id !in paused -> failures.remove(id)
+            }
             publishAccounts()
         }
 
@@ -344,7 +384,7 @@ object SipEngine {
             val linphoneAccount = linked[account.id]
             val status = when {
                 !account.enabled -> RegistrationStatus.Off
-                linphoneAccount == null -> RegistrationStatus.Failed
+                linphoneAccount == null || account.id in paused -> RegistrationStatus.Failed
                 else -> when (linphoneAccount.state) {
                     RegistrationState.Ok, RegistrationState.Refreshing -> RegistrationStatus.Registered
                     RegistrationState.Failed -> RegistrationStatus.Failed

@@ -52,6 +52,7 @@ class DebugCommands : BroadcastReceiver() {
             "$PREFIX.ANSWER" -> SipEngine.answer()
             "$PREFIX.HANG_UP" -> SipEngine.hangUp()
             "$PREFIX.HOLD" -> SipEngine.setHeld(intent.getBooleanExtra("held", true))
+            "$PREFIX.REGISTER" -> SipEngine.refreshRegistrations()
             "$PREFIX.STATE" -> Unit
             else -> Log.w(TAG, "Unknown command ${intent.action}")
         }
