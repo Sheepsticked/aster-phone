@@ -32,6 +32,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.asterphone.Notifications
 import app.asterphone.R
 import app.asterphone.data.AccountStore
+import app.asterphone.data.PhoneContacts
 import app.asterphone.sip.RegistrationStatus
 import app.asterphone.sip.SipEngine
 import kotlinx.coroutines.launch
@@ -54,6 +55,7 @@ fun AppRoot(store: AccountStore, requestedTab: Tab?, onTabHandled: () -> Unit, o
     val detailedLog by SipEngine.detailedLog.collectAsStateWithLifecycle()
     val dialAccount by SipEngine.dialAccount.collectAsStateWithLifecycle()
     val checks = rememberSetupChecks()
+    val contacts by PhoneContacts.directory.collectAsStateWithLifecycle()
     var tab by rememberSaveable { mutableStateOf(Tab.Dial) }
     var editingId by rememberSaveable { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
@@ -86,6 +88,16 @@ fun AppRoot(store: AccountStore, requestedTab: Tab?, onTabHandled: () -> Unit, o
             pendingCall = accountId to number
             microphonePermission.launch(Manifest.permission.RECORD_AUDIO)
         }
+    }
+
+    // The dialer asks for contacts once, in place; later the Setup tab offers it. Re-checked whenever the
+    // checklist is rebuilt, which happens each time the app comes back to the foreground.
+    var contactsAsked by remember { mutableStateOf(PhoneContacts.asked(context)) }
+    val contactsAllowed = remember(checks) { PhoneContacts.allowed(context) }
+    val contactsPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        PhoneContacts.setAsked(context)
+        contactsAsked = true
+        if (granted) PhoneContacts.start(context)
     }
 
     editingId?.let { id ->
@@ -122,6 +134,8 @@ fun AppRoot(store: AccountStore, requestedTab: Tab?, onTabHandled: () -> Unit, o
                     onAddAccount = { editingId = NEW_ACCOUNT },
                     onManageAccounts = { tab = Tab.Accounts },
                     onEditAccount = { editingId = it },
+                    contacts = contacts,
+                    onAllowContacts = if (contactsAllowed || contactsAsked) null else ({ contactsPermission.launch(Manifest.permission.READ_CONTACTS) }),
                 )
                 Tab.Recents -> RecentsScreen(history = history, accounts = accounts, onCallBack = dial)
                 Tab.Accounts -> AccountsScreen(

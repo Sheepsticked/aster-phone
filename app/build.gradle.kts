@@ -23,8 +23,8 @@ android {
         applicationId = "app.asterphone"
         minSdk = 29
         targetSdk = 36
-        versionCode = 8
-        versionName = "0.4.0"
+        versionCode = 9
+        versionName = "0.5.0"
 
         // The SIP library ships native code for four ABIs; current phones only need arm64.
         ndk { abiFilters += "arm64-v8a" }

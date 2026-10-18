@@ -14,6 +14,7 @@ import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.longClick
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -23,6 +24,8 @@ import androidx.compose.ui.test.performTextInputSelection
 import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.text.TextRange
+import app.asterphone.data.ContactDirectory
+import app.asterphone.data.PhoneContact
 import app.asterphone.data.SipAccount
 import app.asterphone.sip.AccountState
 import app.asterphone.sip.CallInfo
@@ -46,12 +49,15 @@ class DialerScreenTest {
     private val edited = mutableListOf<String>()
     private var addClicked = false
     private var manageClicked = false
+    private var contactsRequested = false
 
     private fun show(
         accounts: List<AccountState> = Samples.accounts,
         call: CallInfo? = null,
         remembered: String? = null,
         lastDialed: String? = null,
+        contacts: ContactDirectory = ContactDirectory(emptyList()),
+        askForContacts: Boolean = false,
     ) {
         compose.setContent {
             var selected by remember { mutableStateOf(remembered) }
@@ -70,6 +76,8 @@ class DialerScreenTest {
                     onAddAccount = { addClicked = true },
                     onManageAccounts = { manageClicked = true },
                     onEditAccount = { edited += it },
+                    contacts = contacts,
+                    onAllowContacts = if (askForContacts) ({ contactsRequested = true }) else null,
                 )
             }
         }
@@ -217,6 +225,56 @@ class DialerScreenTest {
         compose.onNodeWithContentDescription("Delete").performTouchInput { longClick() }
         assertNumber("")
         compose.onNodeWithContentDescription("Delete").assertDoesNotExist()
+    }
+
+    @Test
+    fun typingSuggestsAContactAndPickingItFillsTheNumber() {
+        show(contacts = Samples.contacts)
+        compose.onNodeWithTag("suggestion").assertDoesNotExist()
+        press("7946")
+        compose.onNodeWithTag("suggestion").assert(hasText("Alice Smith", substring = true))
+        compose.onNodeWithTag("suggestion").performClick()
+        assertNumber("+442079460018")
+        compose.onNodeWithContentDescription("Call").performClick()
+        assertEquals(listOf("a1" to "+442079460018"), dialed)
+    }
+
+    @Test
+    fun otherMatchingContactsAreOneTapAway() {
+        show(contacts = Samples.contacts)
+        press("7946")
+        compose.onNodeWithContentDescription("1 more contact").performClick()
+        compose.onNodeWithTag("contact-list").assertExists()
+        compose.onNodeWithTag("contact-1").performClick()
+        compose.waitUntil { compose.onAllNodesWithTag("contact-list").fetchSemanticsNodes().isEmpty() }
+        assertNumber("02079460999")
+    }
+
+    @Test
+    fun keypadLettersFindContactsByName() {
+        show(contacts = Samples.contacts)
+        press("5663")
+        compose.onNodeWithTag("suggestion").assert(hasText("Bob Jones", substring = true))
+    }
+
+    @Test
+    fun offersContactsOnceWhenNotAllowed() {
+        show(askForContacts = true)
+        compose.onNodeWithText("Show contacts as you type").performClick()
+        assertTrue(contactsRequested)
+    }
+
+    @Test
+    fun deleteAndContactsSitBesideTheCallButton() {
+        show()
+        compose.onNodeWithContentDescription("Delete").assertDoesNotExist()
+        compose.onNodeWithContentDescription("Contacts").assertExists()
+        press("12")
+        val call = compose.onNodeWithContentDescription("Call").fetchSemanticsNode().boundsInRoot
+        val delete = compose.onNodeWithContentDescription("Delete").fetchSemanticsNode().boundsInRoot
+        val contacts = compose.onNodeWithContentDescription("Contacts").fetchSemanticsNode().boundsInRoot
+        assertTrue(delete.left > call.right && contacts.right < call.left)
+        assertTrue(kotlin.math.abs(delete.center.y - call.center.y) < 1f && kotlin.math.abs(contacts.center.y - call.center.y) < 1f)
     }
 
     @Test

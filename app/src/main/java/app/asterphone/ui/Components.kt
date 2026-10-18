@@ -1,5 +1,6 @@
 package app.asterphone.ui
 
+import android.icu.util.ULocale
 import androidx.annotation.DrawableRes
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -21,10 +22,12 @@ import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
@@ -137,10 +140,17 @@ private val LETTERS = mapOf(
     '2' to "ABC", '3' to "DEF", '4' to "GHI", '5' to "JKL",
     '6' to "MNO", '7' to "PQRS", '8' to "TUV", '9' to "WXYZ",
 )
+private val CYRILLIC_LETTERS = mapOf(
+    '2' to "АБВГ", '3' to "ДЕЖЗ", '4' to "ИЙКЛ", '5' to "МНОП",
+    '6' to "РСТУ", '7' to "ФХЦЧ", '8' to "ШЩЪЫ", '9' to "ЬЭЮЯ",
+)
 
 /** Phone keypad used by the dialer and for in-call tones. With [allowPlus], holding 0 types "+". */
 @Composable
 fun DialPad(onKey: (Char) -> Unit, modifier: Modifier = Modifier, allowPlus: Boolean = false, keySize: Dp = 72.dp) {
+    // Phones in Cyrillic-script languages print both alphabets; small keys have room for one line only.
+    val locale = LocalConfiguration.current.locales[0]
+    val cyrillic = remember(locale) { ULocale.addLikelySubtags(ULocale.forLocale(locale)).script == "Cyrl" } && keySize >= 64.dp
     Column(modifier, verticalArrangement = Arrangement.spacedBy(keySize * 0.18f)) {
         for (row in KEYS) {
             Row(horizontalArrangement = Arrangement.spacedBy(keySize * 0.36f)) {
@@ -149,6 +159,7 @@ fun DialPad(onKey: (Char) -> Unit, modifier: Modifier = Modifier, allowPlus: Boo
                     DialKey(
                         key = key,
                         letters = if (plus) "+" else LETTERS[key].orEmpty(),
+                        secondLetters = if (cyrillic) CYRILLIC_LETTERS[key].orEmpty() else "",
                         size = keySize,
                         onClick = { onKey(key) },
                         onLongClick = if (plus) ({ onKey('+') }) else null,
@@ -161,7 +172,7 @@ fun DialPad(onKey: (Char) -> Unit, modifier: Modifier = Modifier, allowPlus: Boo
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun DialKey(key: Char, letters: String, size: Dp, onClick: () -> Unit, onLongClick: (() -> Unit)?) {
+private fun DialKey(key: Char, letters: String, secondLetters: String, size: Dp, onClick: () -> Unit, onLongClick: (() -> Unit)?) {
     Box(
         Modifier
             .size(size)
@@ -174,8 +185,12 @@ private fun DialKey(key: Char, letters: String, size: Dp, onClick: () -> Unit, o
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             val digitStyle = if (size >= 64.dp) MaterialTheme.typography.headlineMedium else MaterialTheme.typography.headlineSmall
             Text(key.toString(), style = digitStyle, color = MaterialTheme.colorScheme.onSurface)
+            val letterStyle = MaterialTheme.typography.labelSmall.let { it.copy(lineHeight = it.fontSize * 1.1f) }
             if (letters.isNotEmpty()) {
-                Text(letters, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(letters, style = letterStyle, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            if (secondLetters.isNotEmpty()) {
+                Text(secondLetters, style = letterStyle, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
     }

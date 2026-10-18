@@ -1,6 +1,8 @@
 package app.asterphone.ui
 
 import android.os.SystemClock
+import app.asterphone.data.ContactDirectory
+import app.asterphone.data.PhoneContact
 import app.asterphone.data.SipAccount
 import app.asterphone.data.SipTransport
 import app.asterphone.sip.AccountState
@@ -50,8 +52,17 @@ object Samples {
         endReason = "Number not found · SIP 404 Not Found",
     )
 
+    /** Contacts with numbers from ranges reserved for fiction. */
+    val contacts = ContactDirectory(
+        listOf(
+            PhoneContact("Alice Smith", "+44 20 7946 0018", "Mobile"),
+            PhoneContact("Bob Jones", "+1 202-555-0143", "Work"),
+            PhoneContact("Carol", "020 7946 0999", "Home"),
+        ),
+    )
+
     val checks = listOf(
-        SetupCheck("Notifications", "Shows incoming calls and the connection status.", true, true, "Allow") {},
+        SetupCheck("Notifications", "Shows incoming calls, missed calls and connection problems.", true, true, "Allow") {},
         SetupCheck("Microphone", "Lets the other side hear you.", true, true, "Allow") {},
         SetupCheck("Run in background", "Keeps the app connected so calls arrive while the screen is off.", false, true, "Allow") {},
         SetupCheck("Full-screen calls", "Shows the call screen over the lock screen.", true, true, "Allow") {},

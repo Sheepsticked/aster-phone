@@ -19,6 +19,7 @@ import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.dp
 import app.asterphone.call.CallScreen
+import app.asterphone.data.ContactDirectory
 import app.asterphone.sip.AccountState
 import app.asterphone.sip.CallInfo
 import org.junit.Rule
@@ -45,6 +46,15 @@ class ScreenRenderTest {
     @Test fun dialerTyped() = render("dialer-typed", before = { "1234567890".forEach { compose.onNodeWithTag("key-$it").performClick() } }) {
         App(Tab.Dial) { Dialer() }
     }
+
+    @Test
+    fun dialerSuggestion() = render("dialer-suggestion", before = { "7946".forEach { compose.onNodeWithTag("key-$it").performClick() } }) {
+        App(Tab.Dial) { Dialer(contacts = Samples.contacts) }
+    }
+
+    @Test
+    @Config(qualifiers = "w384dp-h832dp-xxhdpi")
+    fun dialerAsksForContacts() = render("dialer-contacts-prompt") { App(Tab.Dial) { Dialer(askForContacts = true) } }
 
     @Test
     fun accountPicker() = render("account-picker") {
@@ -89,8 +99,12 @@ class ScreenRenderTest {
     @Test fun failedCall() = render("call-failed") { CallScreen(Samples.failed, {}, {}, {}, {}, {}, {}, {}) }
 
     @Composable
-    private fun Dialer(accounts: List<AccountState> = Samples.accounts, call: CallInfo? = null) =
-        DialerScreen(accounts, call, null, null, {}, { _, _ -> }, {}, {}, {}, {})
+    private fun Dialer(
+        accounts: List<AccountState> = Samples.accounts,
+        call: CallInfo? = null,
+        contacts: ContactDirectory = ContactDirectory(emptyList()),
+        askForContacts: Boolean = false,
+    ) = DialerScreen(accounts, call, null, null, {}, { _, _ -> }, {}, {}, {}, {}, contacts, if (askForContacts) ({}) else null)
 
     /** The main window: a tab's content above the navigation bar, as the app shows it. */
     @Composable

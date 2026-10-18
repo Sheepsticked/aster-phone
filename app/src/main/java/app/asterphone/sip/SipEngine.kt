@@ -9,6 +9,7 @@ import androidx.annotation.MainThread
 import androidx.core.content.edit
 import app.asterphone.BuildConfig
 import app.asterphone.call.CallNotifications
+import app.asterphone.data.PhoneContacts
 import app.asterphone.data.SipAccount
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -202,6 +203,14 @@ object SipEngine {
         publishAccounts()
         loadHistory()
         syncKeepAlive()
+    }
+
+    /** Shows names from the phone's contacts, which load after the Core starts and can change at any time. */
+    @MainThread
+    fun onContactsChanged() {
+        if (!::core.isInitialized) return
+        loadHistory()
+        publishCall()
     }
 
     @MainThread
@@ -416,7 +425,7 @@ object SipEngine {
                 ?: accounts.firstOrNull { it.username == local.username }
             val number = remote.username.orEmpty()
             HistoryEntry(
-                name = remote.displayName?.takeIf { it.isNotBlank() } ?: number,
+                name = displayName(remote.displayName, number),
                 number = number,
                 accountId = account?.id,
                 accountLabel = account?.label.orEmpty(),
@@ -431,7 +440,7 @@ object SipEngine {
     private fun describe(call: Call): CallInfo {
         val remote = call.remoteAddress
         val number = remote.username.orEmpty()
-        val name = remote.displayName?.takeIf { it.isNotBlank() } ?: number.ifEmpty { remote.asStringUriOnly() }
+        val name = displayName(remote.displayName, number).ifEmpty { remote.asStringUriOnly() }
         val phase = when (call.state) {
             Call.State.IncomingReceived, Call.State.IncomingEarlyMedia, Call.State.PushIncomingReceived -> CallPhase.Ringing
             Call.State.Idle, Call.State.OutgoingInit, Call.State.OutgoingProgress,
@@ -495,6 +504,10 @@ object SipEngine {
         val sipCode = if (info.protocol.equals("SIP", ignoreCase = true)) info.protocolCode else 0
         return registrationFailureText(account.error, message, sipCode, info.phrase)
     }
+
+    /** The contact's name for [number], else the name the caller sent, else the number. */
+    internal fun displayName(sipName: String?, number: String): String =
+        number.takeIf { it.isNotEmpty() }?.let(PhoneContacts::nameFor) ?: sipName?.takeIf { it.isNotBlank() } ?: number
 
     private fun activeCall(): Call? =
         trackedCall?.takeIf { it.state != Call.State.Released } ?: core.currentCall ?: core.calls.firstOrNull()

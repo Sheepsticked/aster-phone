@@ -56,6 +56,7 @@ import androidx.core.content.UnusedAppRestrictionsConstants
 import androidx.core.net.toUri
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import app.asterphone.Notifications
+import app.asterphone.data.PhoneContacts
 import app.asterphone.sip.AccountState
 import app.asterphone.sip.SipEngine
 import kotlinx.coroutines.suspendCancellableCoroutine
@@ -83,7 +84,10 @@ fun rememberSetupChecks(): List<SetupCheck> {
         refresh++
         onPauseOrDispose { }
     }
-    val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { refresh++ }
+    val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
+        refresh++
+        PhoneContacts.start(context)
+    }
     val settingsLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { refresh++ }
     val unusedStatus by produceState(initialValue = UnusedAppRestrictionsConstants.ERROR, refresh) {
         value = unusedAppRestrictionsStatus(context)
@@ -196,6 +200,16 @@ private fun buildChecks(
             },
         )
     }
+
+    add(
+        SetupCheck(
+            "Contacts",
+            "Optional: shows contact names for calls and suggests contacts as you type a number. Contacts stay on the phone.",
+            granted(Manifest.permission.READ_CONTACTS),
+            false,
+            "Allow",
+        ) { requestPermission(Manifest.permission.READ_CONTACTS) },
+    )
 
     if (Build.MANUFACTURER.equals("samsung", ignoreCase = true)) {
         add(

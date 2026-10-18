@@ -43,7 +43,7 @@ internal class TelecomCalls private constructor(private val manager: CallsManage
         val call = session.call
         val number = call.remoteAddress.username.orEmpty()
         val attributes = CallAttributesCompat(
-            displayName = call.remoteAddress.displayName?.takeIf { it.isNotBlank() } ?: number,
+            displayName = SipEngine.displayName(call.remoteAddress.displayName, number),
             address = Uri.fromParts("sip", number, null),
             direction = if (call.dir == Call.Dir.Incoming) CallAttributesCompat.DIRECTION_INCOMING else CallAttributesCompat.DIRECTION_OUTGOING,
             callType = CallAttributesCompat.CALL_TYPE_AUDIO_CALL,

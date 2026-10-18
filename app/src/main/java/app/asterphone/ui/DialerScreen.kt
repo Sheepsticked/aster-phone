@@ -1,6 +1,6 @@
 package app.asterphone.ui
 
-import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.annotation.DrawableRes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -48,6 +48,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -76,8 +77,10 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import app.asterphone.R
+import app.asterphone.data.ContactDirectory
 import app.asterphone.data.SipAccount
 import app.asterphone.sip.AccountState
 import app.asterphone.sip.CallInfo
@@ -97,6 +100,8 @@ fun DialerScreen(
     onAddAccount: () -> Unit,
     onManageAccounts: () -> Unit,
     onEditAccount: (String) -> Unit,
+    contacts: ContactDirectory = ContactDirectory(emptyList()),
+    onAllowContacts: (() -> Unit)? = null,
 ) {
     val usable = accounts.filter { it.account.enabled }
     val selected = usable.firstOrNull { it.account.id == selectedAccountId }
@@ -104,6 +109,10 @@ fun DialerScreen(
         ?: usable.firstOrNull()
     val number = rememberTextFieldState()
     var choosing by rememberSaveable { mutableStateOf(false) }
+    var listingContacts by rememberSaveable { mutableStateOf(false) }
+    val matches = remember(number.text, contacts) { contacts.search(number.text.toString()) }
+    val fill: (String) -> Unit = { number.setTextAndPlaceCursorAtEnd(SipAccount.cleanNumber(it)) }
+    val pickContact = rememberContactPicker(fill)
 
     if (selected == null) {
         NoAccounts(anyAccounts = accounts.isNotEmpty(), onAddAccount = onAddAccount)
@@ -113,8 +122,9 @@ fun DialerScreen(
     val empty = number.text.isBlank()
     BoxWithConstraints(Modifier.fillMaxSize()) {
         // Size the keys to the space left over; on very small screens the dialer scrolls instead.
-        val fixed = (if (call != null) 72.dp else 0.dp) + 300.dp
-        val keySize = ((maxHeight - fixed) / 4.6f).coerceIn(52.dp, 78.dp)
+        // The keypad and the call row are five rows of keys with gaps of 0.18 key between them.
+        val fixed = (if (call != null) 80.dp else 0.dp) + 230.dp
+        val keySize = ((maxHeight - fixed) / 5.72f).coerceIn(52.dp, 78.dp)
         Column(
             Modifier
                 .fillMaxSize()
@@ -129,18 +139,47 @@ fun DialerScreen(
                 AccountSwitcher(selected) { choosing = true }
             }
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Spacer(Modifier.height(16.dp))
+                Spacer(Modifier.height(12.dp))
                 NumberField(number)
-                Spacer(Modifier.height(16.dp))
+                Box(Modifier.fillMaxWidth().height(64.dp), contentAlignment = Alignment.Center) {
+                    val best = matches.firstOrNull()
+                    when {
+                        best != null -> ContactSuggestion(
+                            match = best,
+                            more = matches.size - 1,
+                            onPick = { fill(best.contact.number) },
+                            onMore = { listingContacts = true },
+                        )
+                        onAllowContacts != null -> TextButton(onClick = onAllowContacts) {
+                            Icon(painterResource(R.drawable.ic_contacts), contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(8.dp))
+                            Text("Show contacts as you type")
+                        }
+                    }
+                }
                 DialPad(onKey = number::type, allowPlus = true, keySize = keySize)
-                Spacer(Modifier.height(20.dp))
-                // With an empty field, the first press brings back the last number dialled.
-                CallButton(enabled = call == null && (!empty || lastDialed != null)) {
-                    if (empty) lastDialed?.let(number::setTextAndPlaceCursorAtEnd)
-                    else onDial(selected.account.id, SipAccount.cleanNumber(number.text.toString()))
+                Spacer(Modifier.height(keySize * 0.18f))
+                // The bottom row, where the thumb reaches easily: contacts, call and delete under * 0 #.
+                Row(horizontalArrangement = Arrangement.spacedBy(keySize * 0.36f), verticalAlignment = Alignment.CenterVertically) {
+                    RowButton("Contacts", R.drawable.ic_contacts, keySize, onClick = pickContact)
+                    // With an empty field, the first press brings back the last number dialled.
+                    CallButton(enabled = call == null && (!empty || lastDialed != null), size = keySize) {
+                        if (empty) lastDialed?.let(number::setTextAndPlaceCursorAtEnd)
+                        else onDial(selected.account.id, SipAccount.cleanNumber(number.text.toString()))
+                    }
+                    if (empty) {
+                        Spacer(Modifier.size(keySize))
+                    } else {
+                        // Tap deletes one character; holding clears the number.
+                        RowButton("Delete", R.drawable.ic_backspace, keySize, onClick = number::deleteBack, onLongClick = number::clearText)
+                    }
                 }
             }
         }
+    }
+
+    if (listingContacts) {
+        ContactMatchesSheet(matches = matches, onPick = { fill(it.number) }, onDismiss = { listingContacts = false })
     }
 
     if (choosing) {
@@ -356,12 +395,30 @@ private fun AccountAvatar(state: AccountState, selected: Boolean, background: Co
 private fun AccountState.statusColor(): Color =
     if (status == RegistrationStatus.Failed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
 
+/** A plain round icon button the size of a key, for the row beside the call button. */
 @Composable
-private fun CallButton(enabled: Boolean, onClick: () -> Unit) {
+private fun RowButton(label: String, @DrawableRes icon: Int, size: Dp, onClick: () -> Unit, onLongClick: (() -> Unit)? = null) {
+    Box(
+        Modifier
+            .size(size)
+            .clip(CircleShape)
+            .combinedClickable(onClick = onClick, onLongClick = onLongClick)
+            .semantics {
+                contentDescription = label
+                role = Role.Button
+            },
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(painterResource(icon), contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(28.dp))
+    }
+}
+
+@Composable
+private fun CallButton(enabled: Boolean, size: Dp, onClick: () -> Unit) {
     FilledIconButton(
         onClick = onClick,
         enabled = enabled,
-        modifier = Modifier.size(72.dp),
+        modifier = Modifier.size(size),
         colors = IconButtonDefaults.filledIconButtonColors(
             containerColor = CallGreen,
             contentColor = Color.White,
@@ -374,48 +431,29 @@ private fun CallButton(enabled: Boolean, onClick: () -> Unit) {
 }
 
 /** The number being dialled, with a cursor and paste; the keypad types into it, so the system keyboard stays hidden. */
-@OptIn(ExperimentalComposeUiApi::class, ExperimentalFoundationApi::class)
+@OptIn(ExperimentalComposeUiApi::class)
 @Composable
 private fun NumberField(state: TextFieldState, modifier: Modifier = Modifier) {
     val focus = remember { FocusRequester() }
     LaunchedEffect(Unit) { focus.requestFocus() }
     val text = state.text
-    Row(
+    Box(
         modifier
             .fillMaxWidth()
             .height(64.dp)
-            .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(16.dp)),
-        verticalAlignment = Alignment.CenterVertically,
+            .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(16.dp))
+            .padding(horizontal = 16.dp),
+        contentAlignment = Alignment.Center,
     ) {
-        // Balances the delete button so the number stays centred.
-        Spacer(Modifier.width(48.dp))
         InterceptPlatformTextInput(interceptor = { _, _ -> awaitCancellation() }) {
             BasicTextField(
                 state = state,
-                modifier = Modifier.weight(1f).focusRequester(focus).testTag("number"),
+                modifier = Modifier.fillMaxWidth().focusRequester(focus).testTag("number"),
                 lineLimits = TextFieldLineLimits.SingleLine,
-                textStyle = (if (text.length > 12) MaterialTheme.typography.headlineSmall else MaterialTheme.typography.headlineMedium)
+                textStyle = (if (text.length > 14) MaterialTheme.typography.headlineSmall else MaterialTheme.typography.headlineMedium)
                     .copy(textAlign = TextAlign.Center, color = MaterialTheme.colorScheme.onSurface),
                 cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
             )
-        }
-        Box(Modifier.size(48.dp), contentAlignment = Alignment.Center) {
-            if (text.isNotEmpty()) {
-                // Tap deletes one character; holding clears the number.
-                Box(
-                    Modifier
-                        .size(48.dp)
-                        .clip(CircleShape)
-                        .combinedClickable(onClick = state::deleteBack, onLongClick = state::clearText)
-                        .semantics {
-                            contentDescription = "Delete"
-                            role = Role.Button
-                        },
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(painterResource(R.drawable.ic_backspace), contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-            }
         }
     }
 }

@@ -10,6 +10,9 @@ reached over a LAN or a VPN.
 - Incoming call screen over the lock screen, mute, speaker, hold, DTMF keypad
 - Calls are registered with Android's Telecom service: answering a mobile call puts the SIP call on hold,
   and Bluetooth headsets, watches and cars can answer or end it
+- Names from the phone's contacts on calls, notifications and call history. While a number is typed, the
+  dialer suggests matching contacts by number or by name spelled on the keypad letters; the Contacts button
+  next to Call opens the phone's contact picker. Contacts are read on the phone only and never sent anywhere
 - Call history with call back through the same account
 - A setup checklist for the Android and Samsung battery settings that would otherwise stop background calls
 

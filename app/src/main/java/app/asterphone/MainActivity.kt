@@ -9,6 +9,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import app.asterphone.call.CallActivity
+import app.asterphone.data.PhoneContacts
 import app.asterphone.sip.SipEngine
 import app.asterphone.ui.AppRoot
 import app.asterphone.ui.AsterPhoneTheme
@@ -43,6 +44,8 @@ class MainActivity : ComponentActivity() {
         super.onStart()
         // Starting the service is always allowed while the app is visible, so retry here.
         SipEngine.syncKeepAlive()
+        // Contacts may have been allowed in the system settings meanwhile.
+        PhoneContacts.start(this)
     }
 
     private fun openCall() {

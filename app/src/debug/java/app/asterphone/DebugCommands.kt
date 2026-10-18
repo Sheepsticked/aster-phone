@@ -4,11 +4,15 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.util.Log
+import android.os.SystemClock
+import app.asterphone.data.PhoneContacts
 import app.asterphone.data.SipAccount
 import app.asterphone.data.SipTransport
 import app.asterphone.sip.SipEngine
 import kotlinx.coroutines.MainScope
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * Debug builds only: drives the app from adb without the screen, for example
@@ -54,6 +58,19 @@ class DebugCommands : BroadcastReceiver() {
             "$PREFIX.HOLD" -> SipEngine.setHeld(intent.getBooleanExtra("held", true))
             "$PREFIX.REGISTER" -> SipEngine.refreshRegistrations()
             "$PREFIX.STATE" -> Unit
+            // Logs counts only, never names or numbers.
+            "$PREFIX.CONTACTS" -> {
+                val started = SystemClock.elapsedRealtime()
+                PhoneContacts.start(app)
+                val directory = withTimeoutOrNull(10_000) { PhoneContacts.directory.first { it.contacts.isNotEmpty() } }
+                val digits = intent.getStringExtra("digits").orEmpty()
+                Log.i(
+                    TAG,
+                    "contacts=${directory?.contacts?.size} in ${SystemClock.elapsedRealtime() - started} ms, " +
+                        "matches for ${digits.length} digits=${directory?.search(digits)?.size}, " +
+                        "caller named=${intent.getStringExtra("number")?.let { directory?.nameFor(it) != null }}",
+                )
+            }
             else -> Log.w(TAG, "Unknown command ${intent.action}")
         }
     }
