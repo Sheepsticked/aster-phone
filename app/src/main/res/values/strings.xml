@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Aster Phone</string>
+
+    <string name="channel_status">Background connection</string>
+    <string name="channel_status_desc">Shown while the app stays connected to receive calls</string>
+    <string name="channel_incoming">Incoming calls</string>
+    <string name="channel_ongoing">Ongoing calls</string>
+    <string name="channel_missed">Missed calls</string>
+
+    <string name="status_no_accounts">No accounts enabled</string>
+    <plurals name="status_all_registered">
+        <item quantity="one">Ready for calls on %d account</item>
+        <item quantity="other">Ready for calls on %d accounts</item>
+    </plurals>
+    <string name="status_registering">Connecting…</string>
+    <string name="status_some_failed">Not registered: %1$s</string>
+
+    <string name="call_incoming">Incoming call · %1$s</string>
+    <string name="call_dialing">Calling… · %1$s</string>
+    <string name="call_connected">On call · %1$s</string>
+    <string name="call_hang_up">Hang up</string>
+    <string name="call_missed_title">Missed call</string>
+    <string name="call_missed_text">%1$s · %2$s</string>
+</resources>
