@@ -43,6 +43,7 @@ class DialerScreenTest {
 
     private val dialed = mutableListOf<Pair<String, String>>()
     private val chosen = mutableListOf<String>()
+    private val edited = mutableListOf<String>()
     private var addClicked = false
     private var manageClicked = false
 
@@ -68,6 +69,7 @@ class DialerScreenTest {
                     onOpenCall = {},
                     onAddAccount = { addClicked = true },
                     onManageAccounts = { manageClicked = true },
+                    onEditAccount = { edited += it },
                 )
             }
         }
@@ -114,6 +116,18 @@ class DialerScreenTest {
         compose.onNodeWithContentDescription("Call").performClick()
         assertEquals(listOf("a2"), chosen)
         assertEquals(listOf("a2" to "42"), dialed)
+    }
+
+    @Test
+    fun holdingAnAccountOpensItsSettings() {
+        show()
+        openAccounts()
+        compose.onNodeWithTag("pick-a2").performTouchInput { longClick() }
+        compose.waitUntil { edited.isNotEmpty() }
+        assertEquals(listOf("a2"), edited)
+        assertTrue(chosen.isEmpty())
+        compose.onNodeWithTag("account-list").assertDoesNotExist()
+        assertAccount("Office", "Registered")
     }
 
     @Test

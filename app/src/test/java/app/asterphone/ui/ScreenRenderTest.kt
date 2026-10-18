@@ -49,7 +49,7 @@ class ScreenRenderTest {
     @Test
     fun accountPicker() = render("account-picker") {
         Surface(color = MaterialTheme.colorScheme.surfaceContainerLow, shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)) {
-            AccountPicker(Samples.threeAccounts, selectedId = "a1", offCount = 1, onSelect = {}, onAdd = {}, onManage = {})
+            AccountPicker(Samples.threeAccounts, selectedId = "a1", offCount = 1, onSelect = {}, onAdd = {}, onManage = {}, onEdit = {})
         }
     }
 
@@ -90,7 +90,7 @@ class ScreenRenderTest {
 
     @Composable
     private fun Dialer(accounts: List<AccountState> = Samples.accounts, call: CallInfo? = null) =
-        DialerScreen(accounts, call, null, null, {}, { _, _ -> }, {}, {}, {})
+        DialerScreen(accounts, call, null, null, {}, { _, _ -> }, {}, {}, {}, {})
 
     /** The main window: a tab's content above the navigation bar, as the app shows it. */
     @Composable

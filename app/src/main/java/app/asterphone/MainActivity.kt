@@ -49,11 +49,15 @@ class MainActivity : ComponentActivity() {
         startActivity(Intent(this, CallActivity::class.java).setAction(CallActivity.ACTION_SHOW))
     }
 
-    private fun tabFrom(intent: Intent?): Tab? =
-        if (intent?.getStringExtra(EXTRA_TAB) == TAB_RECENTS) Tab.Recents else null
+    private fun tabFrom(intent: Intent?): Tab? = when (intent?.getStringExtra(EXTRA_TAB)) {
+        TAB_RECENTS -> Tab.Recents
+        TAB_ACCOUNTS -> Tab.Accounts
+        else -> null
+    }
 
     companion object {
         const val EXTRA_TAB = "tab"
         const val TAB_RECENTS = "recents"
+        const val TAB_ACCOUNTS = "accounts"
     }
 }

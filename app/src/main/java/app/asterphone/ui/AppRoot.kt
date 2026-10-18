@@ -121,6 +121,7 @@ fun AppRoot(store: AccountStore, requestedTab: Tab?, onTabHandled: () -> Unit, o
                     onOpenCall = onOpenCall,
                     onAddAccount = { editingId = NEW_ACCOUNT },
                     onManageAccounts = { tab = Tab.Accounts },
+                    onEditAccount = { editingId = it },
                 )
                 Tab.Recents -> RecentsScreen(history = history, accounts = accounts, onCallBack = dial)
                 Tab.Accounts -> AccountsScreen(

@@ -55,6 +55,7 @@ import androidx.core.content.PackageManagerCompat
 import androidx.core.content.UnusedAppRestrictionsConstants
 import androidx.core.net.toUri
 import androidx.lifecycle.compose.LifecycleResumeEffect
+import app.asterphone.Notifications
 import app.asterphone.sip.AccountState
 import app.asterphone.sip.SipEngine
 import kotlinx.coroutines.suspendCancellableCoroutine
@@ -121,13 +122,25 @@ private fun buildChecks(
 
     val notificationsOk = context.getSystemService(NotificationManager::class.java).areNotificationsEnabled()
     add(
-        SetupCheck("Notifications", "Shows incoming calls and the connection status.", notificationsOk, true, "Allow") {
+        SetupCheck("Notifications", "Shows incoming calls, missed calls and connection problems.", notificationsOk, true, "Allow") {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && !granted(Manifest.permission.POST_NOTIFICATIONS)) {
                 requestPermission(Manifest.permission.POST_NOTIFICATIONS)
             } else {
                 openSettings(Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName))
             }
         },
+    )
+
+    val statusHidden = Notifications.isStatusHidden(context)
+    add(
+        SetupCheck(
+            "Hide the background notification",
+            if (statusHidden) "Hidden. Calls, missed calls and connection problems still show."
+            else "Android shows a notification while the app waits for calls. You can turn it off; calls, missed calls and connection problems still show.",
+            statusHidden,
+            false,
+            "Hide",
+        ) { openSettings(Notifications.statusSettingsIntent(context)) },
     )
 
     add(

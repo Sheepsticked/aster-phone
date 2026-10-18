@@ -4,7 +4,8 @@ A small Android SIP softphone for one self-hosted Asterisk server, such as an As
 reached over a LAN or a VPN.
 
 - Several SIP accounts at once, each with its own registration status. The dialer shows the account calls go
-  through at the top; tapping it opens a scrollable list of all accounts, and the choice is remembered
+  through at the top; tapping it opens a scrollable list of all accounts, and the choice is remembered.
+  Holding an account in that list opens its settings
 - Receives calls in the background without push notifications or Google services
 - Incoming call screen over the lock screen, mute, speaker, hold, DTMF keypad
 - Calls are registered with Android's Telecom service: answering a mobile call puts the SIP call on hold,
@@ -16,9 +17,15 @@ Calls use G.711 (PCMA/PCMU) over UDP or TCP. TLS, video and messaging are out of
 
 ## How it stays reachable
 
-The app keeps a foreground service running (shown as a quiet "Ready for calls" notification) so Android
-doesn't stop the process that holds the SIP registrations. For this to survive on a phone, the app must be
-allowed to run in the background. The **Setup** tab lists each setting and opens the right screen for it.
+The app keeps a foreground service running so Android doesn't stop the process that holds the SIP
+registrations. For this to survive on a phone, the app must be allowed to run in the background. The
+**Setup** tab lists each setting and opens the right screen for it. After a reboot the service starts on its
+own once the phone has been unlocked for the first time.
+
+Android shows a notification for every foreground service. Its **Hide** button opens the settings for that
+notification, where it can be turned off; the service keeps running. Other notifications appear only when
+there is something to act on: an incoming or missed call, or an account that has not been registered for two
+minutes.
 
 On Samsung phones, also add the app to **Settings → Battery → Background usage limits → Never sleeping apps**.
 

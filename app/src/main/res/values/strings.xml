@@ -2,19 +2,21 @@
 <resources>
     <string name="app_name">Aster Phone</string>
 
-    <string name="channel_status">Background connection</string>
-    <string name="channel_status_desc">Shown while the app stays connected to receive calls</string>
+    <string name="channel_status">Running in background</string>
+    <string name="channel_status_desc">Android shows this while the app waits for calls. Turn it off to hide it; calls and connection problems still show.</string>
     <string name="channel_incoming">Incoming calls</string>
     <string name="channel_ongoing">Ongoing calls</string>
     <string name="channel_missed">Missed calls</string>
+    <string name="channel_problems">Connection problems</string>
+    <string name="channel_problems_desc">Shown when an account can\'t receive calls for more than two minutes</string>
 
-    <string name="status_no_accounts">No accounts enabled</string>
-    <plurals name="status_all_registered">
-        <item quantity="one">Ready for calls on %d account</item>
-        <item quantity="other">Ready for calls on %d accounts</item>
-    </plurals>
-    <string name="status_registering">Connecting…</string>
-    <string name="status_some_failed">Not registered: %1$s</string>
+    <string name="status_title">Running in the background</string>
+    <string name="status_text">Android shows this while the app waits for calls. Tap Hide to turn it off.</string>
+    <string name="status_hide">Hide</string>
+
+    <string name="problem_title">Not registered: %1$s</string>
+    <string name="problem_not_connected">Not connected to the server</string>
+    <string name="problem_retry">Retry</string>
 
     <string name="call_incoming">Incoming call · %1$s</string>
     <string name="call_dialing">Calling… · %1$s</string>

@@ -21,7 +21,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -72,6 +71,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.style.TextAlign
@@ -96,6 +96,7 @@ fun DialerScreen(
     onOpenCall: () -> Unit,
     onAddAccount: () -> Unit,
     onManageAccounts: () -> Unit,
+    onEditAccount: (String) -> Unit,
 ) {
     val usable = accounts.filter { it.account.enabled }
     val selected = usable.firstOrNull { it.account.id == selectedAccountId }
@@ -150,6 +151,7 @@ fun DialerScreen(
             onSelect = onSelectAccount,
             onAdd = onAddAccount,
             onManage = onManageAccounts,
+            onEdit = onEditAccount,
             onDismiss = { choosing = false },
         )
     }
@@ -230,6 +232,7 @@ private fun AccountSheet(
     onSelect: (String) -> Unit,
     onAdd: () -> Unit,
     onManage: () -> Unit,
+    onEdit: (String) -> Unit,
     onDismiss: () -> Unit,
 ) {
     val sheetState = rememberModalBottomSheetState()
@@ -252,11 +255,12 @@ private fun AccountSheet(
             },
             onAdd = { close(onAdd) },
             onManage = { close(onManage) },
+            onEdit = { id -> close { onEdit(id) } },
         )
     }
 }
 
-/** Every enabled account, then links to add and manage accounts. Scrolls when there are many. */
+/** Every enabled account, then links to add and manage accounts. Holding an account opens its settings. */
 @Composable
 fun AccountPicker(
     usable: List<AccountState>,
@@ -265,6 +269,7 @@ fun AccountPicker(
     onSelect: (String) -> Unit,
     onAdd: () -> Unit,
     onManage: () -> Unit,
+    onEdit: (String) -> Unit,
 ) {
     val transparent = ListItemDefaults.colors(containerColor = Color.Transparent)
     LazyColumn(Modifier.fillMaxWidth().testTag("account-list")) {
@@ -278,7 +283,13 @@ fun AccountPicker(
                 modifier = Modifier
                     .padding(horizontal = 8.dp)
                     .clip(RoundedCornerShape(16.dp))
-                    .selectable(selected = isSelected, role = Role.RadioButton) { onSelect(state.account.id) }
+                    .semantics { selected = isSelected }
+                    .combinedClickable(
+                        role = Role.RadioButton,
+                        onLongClickLabel = "Edit account",
+                        onLongClick = { onEdit(state.account.id) },
+                        onClick = { onSelect(state.account.id) },
+                    )
                     .testTag("pick-${state.account.id}"),
                 colors = if (isSelected) ListItemDefaults.colors(containerColor = background) else transparent,
                 leadingContent = { AccountAvatar(state, isSelected, background) },
