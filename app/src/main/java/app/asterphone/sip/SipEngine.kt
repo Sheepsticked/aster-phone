@@ -26,7 +26,7 @@ enum class RegistrationStatus { Off, Connecting, Registered, Failed }
 
 data class AccountState(val account: SipAccount, val status: RegistrationStatus, val detail: String = "")
 
-enum class CallPhase { Ringing, Dialing, Connected, Ended }
+enum class CallPhase { Ringing, Dialing, Connected, OnHold, Ended }
 
 data class CallInfo(
     val name: String,
@@ -73,6 +73,7 @@ object SipEngine {
     private var endReason: String? = null
     // The call shown in the UI, tracked from callbacks so it is known before the Core lists it.
     private var trackedCall: Call? = null
+    private var telecom: TelecomCalls? = null
 
     private val _accounts = MutableStateFlow<List<AccountState>>(emptyList())
     val accounts: StateFlow<List<AccountState>> = _accounts.asStateFlow()
@@ -108,6 +109,9 @@ object SipEngine {
         // With no config file the Core keeps its database, including call history, in the app's files directory.
         core = factory.createCore(null, null, context)
         configure(core)
+        telecom = TelecomCalls.create(context)
+        // Telecom takes audio focus for its calls, so the SIP library must not compete for it.
+        if (telecom != null) core.config.setBool("audio", "android_disable_audio_focus_requests", true)
         core.addListener(listener)
         core.start()
         loadHistory()
@@ -281,6 +285,14 @@ object SipEngine {
         publishCall()
     }
 
+    /** Puts the call on hold, or takes it off hold. */
+    @MainThread
+    fun setHeld(held: Boolean) {
+        val call = activeCall() ?: return
+        if (held && call.state == Call.State.StreamsRunning) call.pause()
+        if (!held && call.state == Call.State.Paused) call.resume()
+    }
+
     @MainThread
     fun sendDtmf(digit: Char) {
         activeCall()?.sendDtmf(digit)
@@ -294,6 +306,7 @@ object SipEngine {
         }
 
         override fun onCallStateChanged(core: Core, call: Call, state: Call.State?, message: String) {
+            if (state != null) telecom?.onCallState(call, state)
             val tracked = track(call, state)
             when (state) {
                 Call.State.IncomingReceived -> if (tracked) {
@@ -380,6 +393,7 @@ object SipEngine {
             Call.State.Idle, Call.State.OutgoingInit, Call.State.OutgoingProgress,
             Call.State.OutgoingRinging, Call.State.OutgoingEarlyMedia -> CallPhase.Dialing
             Call.State.End, Call.State.Error, Call.State.Released -> CallPhase.Ended
+            Call.State.Pausing, Call.State.Paused -> CallPhase.OnHold
             else -> CallPhase.Connected
         }
         return CallInfo(
@@ -388,7 +402,7 @@ object SipEngine {
             accountLabel = accountFor(call)?.label.orEmpty(),
             incoming = call.dir == Call.Dir.Incoming,
             phase = phase,
-            connectedAt = if (phase == CallPhase.Connected) connectedAt else null,
+            connectedAt = if (phase == CallPhase.Connected || phase == CallPhase.OnHold) connectedAt else null,
             muted = call.microphoneMuted,
             speaker = call.outputAudioDevice?.type == AudioDevice.Type.Speaker,
             endReason = if (phase == CallPhase.Ended) endReason else null,

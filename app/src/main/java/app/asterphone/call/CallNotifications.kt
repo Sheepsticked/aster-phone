@@ -41,7 +41,11 @@ object CallNotifications {
                 .build()
         }
 
-        val text = if (info?.phase == CallPhase.Dialing) R.string.call_dialing else R.string.call_connected
+        val text = when (info?.phase) {
+            CallPhase.Dialing -> R.string.call_dialing
+            CallPhase.OnHold -> R.string.call_on_hold
+            else -> R.string.call_connected
+        }
         val builder = NotificationCompat.Builder(context, Notifications.CHANNEL_ONGOING)
             .setSmallIcon(R.drawable.ic_stat_call)
             .setContentTitle(info?.name ?: context.getString(R.string.app_name))

@@ -4,6 +4,7 @@ kotlin = "2.4.20"
 composeBom = "2026.09.00"
 activityCompose = "1.13.0"
 coreKtx = "1.19.1"
+coreTelecom = "1.0.1"
 datastore = "1.2.1"
 lifecycle = "2.11.0"
 media = "1.8.0"
@@ -15,6 +16,7 @@ robolectric = "4.17"
 [libraries]
 linphone = { group = "org.linphone", name = "linphone-sdk-android", version.ref = "linphone" }
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
+androidx-core-telecom = { group = "androidx.core", name = "core-telecom", version.ref = "coreTelecom" }
 androidx-media = { group = "androidx.media", name = "media", version.ref = "media" }
 androidx-activity-compose = { group = "androidx.activity", name = "activity-compose", version.ref = "activityCompose" }
 androidx-lifecycle-runtime-compose = { group = "androidx.lifecycle", name = "lifecycle-runtime-compose", version.ref = "lifecycle" }

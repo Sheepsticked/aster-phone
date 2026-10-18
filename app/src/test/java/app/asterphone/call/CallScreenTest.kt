@@ -11,6 +11,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
 import app.asterphone.sip.CallInfo
+import app.asterphone.sip.CallPhase
 import app.asterphone.ui.AsterPhoneTheme
 import app.asterphone.ui.Samples
 import org.junit.Assert.assertEquals
@@ -38,6 +39,7 @@ class CallScreenTest {
                     onHangUp = { events += "hangup" },
                     onMute = { events += "mute=$it" },
                     onSpeaker = { events += "speaker=$it" },
+                    onHold = { events += "hold=$it" },
                     onDtmf = { events += "dtmf=$it" },
                 )
             }
@@ -77,6 +79,22 @@ class CallScreenTest {
         compose.onNodeWithTag("key-0").performTouchInput { longClick() }
         assertEquals(listOf("dtmf=1", "dtmf=2", "dtmf=#", "dtmf=0"), events)
         compose.onNodeWithText("12#0").assertExists()
+    }
+
+    @Test
+    fun holdTogglesAndHeldCallSaysSo() {
+        show(Samples.connected)
+        compose.onNodeWithContentDescription("Hold").assertIsOff().performClick()
+        assertEquals(listOf("hold=true"), events)
+    }
+
+    @Test
+    fun heldCallCanBeTakenOffHold() {
+        show(Samples.connected.copy(phase = CallPhase.OnHold))
+        compose.onNodeWithText("On hold").assertExists()
+        compose.onNodeWithContentDescription("Hold").assertIsOn().performClick()
+        compose.onNodeWithContentDescription("Hang up").assertExists()
+        assertEquals(listOf("hold=false"), events)
     }
 
     @Test

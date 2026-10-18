@@ -23,8 +23,8 @@ android {
         applicationId = "app.asterphone"
         minSdk = 29
         targetSdk = 36
-        versionCode = 4
-        versionName = "0.2.2"
+        versionCode = 5
+        versionName = "0.3.0"
 
         // The SIP library ships native code for four ABIs; current phones only need arm64.
         ndk { abiFilters += "arm64-v8a" }
@@ -42,6 +42,10 @@ android {
     }
 
     buildTypes {
+        debug {
+            // Installs next to the release build, so it can be tested on a phone that uses the app.
+            applicationIdSuffix = ".debug"
+        }
         release {
             // The SIP library ships its own keep rules for the classes its native code uses.
             isMinifyEnabled = true
@@ -86,6 +90,8 @@ android {
 dependencies {
     implementation(libs.linphone)
     implementation(libs.androidx.core.ktx)
+    // Registers calls with Android's Telecom service, which coordinates them with mobile calls.
+    implementation(libs.androidx.core.telecom)
     // Lets the SIP library manage audio focus and play the system ringtone.
     implementation(libs.androidx.media)
     implementation(libs.androidx.activity.compose)

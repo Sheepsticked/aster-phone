@@ -46,11 +46,12 @@ fun CallScreen(
     onHangUp: () -> Unit,
     onMute: (Boolean) -> Unit,
     onSpeaker: (Boolean) -> Unit,
+    onHold: (Boolean) -> Unit,
     onDtmf: (Char) -> Unit,
 ) {
     var showKeypad by rememberSaveable { mutableStateOf(false) }
     var tones by rememberSaveable { mutableStateOf("") }
-    val active = call != null && (call.phase == CallPhase.Dialing || call.phase == CallPhase.Connected)
+    val active = call != null && (call.phase == CallPhase.Dialing || call.phase == CallPhase.Connected || call.phase == CallPhase.OnHold)
     val keypadShown = showKeypad && active
 
     Surface(Modifier.fillMaxSize()) {
@@ -114,6 +115,7 @@ fun CallScreen(
                         RoundToggle("Mute", R.drawable.ic_mic_off, call.muted) { onMute(!call.muted) }
                         RoundToggle("Speaker", R.drawable.ic_volume_up, call.speaker) { onSpeaker(!call.speaker) }
                         RoundToggle("Keypad", R.drawable.ic_dialpad, showKeypad) { showKeypad = !showKeypad }
+                        RoundToggle("Hold", R.drawable.ic_pause, call.phase == CallPhase.OnHold) { onHold(call.phase != CallPhase.OnHold) }
                     }
                     Spacer(Modifier.height(32.dp))
                     RoundAction("Hang up", R.drawable.ic_call_end, CallRed, onHangUp)
@@ -139,5 +141,6 @@ private fun statusText(call: CallInfo?): String {
         CallPhase.Ringing -> "Incoming call"
         CallPhase.Dialing -> "Calling…"
         CallPhase.Connected -> connectedAt?.let { formatDuration(((now - it) / 1000).toInt().coerceAtLeast(0)) } ?: "Connected"
+        CallPhase.OnHold -> "On hold"
     }
 }

@@ -6,7 +6,9 @@ reached over a LAN or a VPN.
 - Several SIP accounts at once, each with its own registration status. The dialer shows the account calls go
   through at the top; tapping it opens a scrollable list of all accounts, and the choice is remembered
 - Receives calls in the background without push notifications or Google services
-- Incoming call screen over the lock screen, mute, speaker, DTMF keypad
+- Incoming call screen over the lock screen, mute, speaker, hold, DTMF keypad
+- Calls are registered with Android's Telecom service: answering a mobile call puts the SIP call on hold,
+  and Bluetooth headsets, watches and cars can answer or end it
 - Call history with call back through the same account
 - A setup checklist for the Android and Samsung battery settings that would otherwise stop background calls
 
@@ -19,6 +21,9 @@ doesn't stop the process that holds the SIP registrations. For this to survive o
 allowed to run in the background. The **Setup** tab lists each setting and opens the right screen for it.
 
 On Samsung phones, also add the app to **Settings → Battery → Background usage limits → Never sleeping apps**.
+
+Registering calls with Telecom also matters for the incoming call screen: some phones open the full-screen
+call screen over the lock screen only for calls that Telecom knows about.
 
 ## Building
 

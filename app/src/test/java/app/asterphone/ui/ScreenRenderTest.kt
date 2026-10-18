@@ -77,16 +77,16 @@ class ScreenRenderTest {
 
     @Test fun setup() = render("setup") { App(Tab.Setup, setupNeedsAction = true) { SetupScreen(Samples.checks, Samples.accounts, detailedLog = false, onDetailedLog = {}) } }
 
-    @Test fun incomingCall() = render("call-incoming") { CallScreen(Samples.incoming, {}, {}, {}, {}, {}, {}) }
+    @Test fun incomingCall() = render("call-incoming") { CallScreen(Samples.incoming, {}, {}, {}, {}, {}, {}, {}) }
 
-    @Test fun connectedCall() = render("call-connected", dark = true) { CallScreen(Samples.connected, {}, {}, {}, {}, {}, {}) }
+    @Test fun connectedCall() = render("call-connected", dark = true) { CallScreen(Samples.connected, {}, {}, {}, {}, {}, {}, {}) }
 
     @Test
     fun callKeypad() = render("call-keypad", before = { compose.onNodeWithContentDescription("Keypad").performClick() }) {
-        CallScreen(Samples.connected, {}, {}, {}, {}, {}, {})
+        CallScreen(Samples.connected, {}, {}, {}, {}, {}, {}, {})
     }
 
-    @Test fun failedCall() = render("call-failed") { CallScreen(Samples.failed, {}, {}, {}, {}, {}, {}) }
+    @Test fun failedCall() = render("call-failed") { CallScreen(Samples.failed, {}, {}, {}, {}, {}, {}, {}) }
 
     @Composable
     private fun Dialer(accounts: List<AccountState> = Samples.accounts, call: CallInfo? = null) =

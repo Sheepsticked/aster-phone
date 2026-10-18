@@ -67,6 +67,7 @@ class CallActivity : ComponentActivity() {
                     onHangUp = SipEngine::hangUp,
                     onMute = SipEngine::setMuted,
                     onSpeaker = SipEngine::setSpeaker,
+                    onHold = SipEngine::setHeld,
                     onDtmf = SipEngine::sendDtmf,
                 )
             }
