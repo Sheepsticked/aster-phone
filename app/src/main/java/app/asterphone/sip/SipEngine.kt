@@ -285,6 +285,10 @@ object SipEngine {
         publishCall()
     }
 
+    /** The call in progress as it is right now, which can be ahead of [call] inside a state change. */
+    @MainThread
+    fun currentCall(): CallInfo? = if (::core.isInitialized) activeCall()?.let { describe(it) } else null
+
     /** Puts the call on hold, or takes it off hold. */
     @MainThread
     fun setHeld(held: Boolean) {

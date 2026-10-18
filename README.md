@@ -22,9 +22,6 @@ allowed to run in the background. The **Setup** tab lists each setting and opens
 
 On Samsung phones, also add the app to **Settings → Battery → Background usage limits → Never sleeping apps**.
 
-Registering calls with Telecom also matters for the incoming call screen: some phones open the full-screen
-call screen over the lock screen only for calls that Telecom knows about.
-
 ## Building
 
 Requirements: JDK 17 or newer and the Android SDK (platform 37).

@@ -27,7 +27,9 @@ class CallService : CoreService() {
     }
 
     private fun goForeground() {
-        val notification = CallNotifications.build(this, SipEngine.call.value)
+        // Built from the live call: the SIP library can ask for this before the app has published the new call,
+        // and a plain notification updated into a ringing one doesn't open the full-screen call screen.
+        val notification = CallNotifications.build(this, SipEngine.currentCall())
         val phoneCall = ServiceInfo.FOREGROUND_SERVICE_TYPE_PHONE_CALL
         val microphone = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE else 0
         try {
