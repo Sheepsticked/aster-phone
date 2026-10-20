@@ -193,10 +193,7 @@ fun DialerScreen(
                                 haptics.tap()
                                 number.deleteBack()
                             },
-                            onLongClick = {
-                                haptics.longPress()
-                                number.clearText()
-                            },
+                            onLongClick = { number.clearText() },
                             onLongClickLabel = "Clear number",
                         )
                     }

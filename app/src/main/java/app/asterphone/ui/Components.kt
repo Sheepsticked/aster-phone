@@ -125,10 +125,6 @@ class Haptics(private val view: View) {
     fun tap() {
         view.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
     }
-
-    fun longPress() {
-        view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
-    }
 }
 
 @Composable
@@ -279,10 +275,8 @@ fun DialPad(onKey: (Char) -> Unit, modifier: Modifier = Modifier, allowPlus: Boo
                             haptics.tap()
                             onKey(key)
                         },
-                        onLongClick = if (plus) ({
-                            haptics.longPress()
-                            onKey('+')
-                        }) else null,
+                        // combinedClickable gives the long-press feedback itself.
+                        onLongClick = if (plus) ({ onKey('+') }) else null,
                         longClickLabel = if (plus) "Type plus" else null,
                     )
                 }
