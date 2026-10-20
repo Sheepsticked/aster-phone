@@ -28,7 +28,7 @@ fun AsterPhoneTheme(content: @Composable () -> Unit) {
     val colors = when {
         Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> if (dark) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
         dark -> darkColorScheme(primary = Color(0xFF38BDF8))
-        else -> lightColorScheme(primary = Color(0xFF0284C7))
+        else -> lightColorScheme(primary = Color(0xFF0369A1))
     }
     // Cards and other medium surfaces share one corner radius with the app's bars.
     MaterialTheme(colorScheme = colors, shapes = Shapes(medium = RoundedCornerShape(16.dp)), content = content)
