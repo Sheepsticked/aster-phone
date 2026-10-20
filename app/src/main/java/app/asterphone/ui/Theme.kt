@@ -21,8 +21,8 @@ fun AsterPhoneTheme(content: @Composable () -> Unit) {
     val context = LocalContext.current
     val colors = when {
         Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> if (dark) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
-        dark -> darkColorScheme(primary = Color(0xFF6FD8AE))
-        else -> lightColorScheme(primary = Color(0xFF0B6E4F))
+        dark -> darkColorScheme(primary = Color(0xFFCDBDFF))
+        else -> lightColorScheme(primary = Color(0xFF5B3FA8))
     }
     MaterialTheme(colorScheme = colors, content = content)
 }

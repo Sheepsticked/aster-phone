@@ -18,6 +18,8 @@ reached over a LAN or a VPN.
 
 Calls use G.711 (PCMA/PCMU) over UDP or TCP. TLS, video and messaging are out of scope.
 
+The launcher icon is an aster flower that doubles as an asterisk, with a handset in its golden centre.
+
 ## How it stays reachable
 
 The app keeps a foreground service running so Android doesn't stop the process that holds the SIP
@@ -41,7 +43,8 @@ echo "sdk.dir=$HOME/Android/Sdk" > local.properties
 ./gradlew assembleDebug testDebugUnitTest
 ```
 
-The APK is written to `app/build/outputs/apk/debug/`. The unit tests include Compose UI tests that run on the
+The APK is written to `app/build/outputs/apk/debug/`. The debug build installs next to the release app and has
+a slate-grey launcher icon, so the two can be told apart. The unit tests include Compose UI tests that run on the
 JVM through Robolectric and save a PNG of every screen to `app/build/screenshots/`.
 
 Release builds are signed when a properties file exists at `~/.android-keys/asterphone-signing.properties`
