@@ -13,7 +13,8 @@ reached over a LAN or a VPN.
 - Names from the phone's contacts on calls, notifications and call history. While a number is typed, the
   dialer suggests matching contacts by number or by name spelled on the keypad letters; the Contacts button
   next to Call opens the phone's contact picker. Contacts are read on the phone only and never sent anywhere
-- Call history with call back through the same account
+- Call history: tapping an entry puts its number in the dialer, with the account it used when that is still on;
+  the phone icon calls back at once through the same account
 - A setup checklist for the Android and Samsung battery settings that would otherwise stop background calls
 
 Calls use G.711 (PCMA/PCMU) over UDP or TCP. TLS, video and messaging are out of scope.

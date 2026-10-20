@@ -7,8 +7,10 @@ import android.text.format.DateUtils
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
@@ -22,6 +24,7 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
+import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -44,15 +47,26 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 
+/**
+ * Call history. Tapping an entry shows its number in the dialer through [onOpenInDialer], with the entry's account
+ * or null when that account is gone or off; the phone icon calls back at once through [onCallBack].
+ */
 @Composable
 fun RecentsScreen(
     history: List<HistoryEntry>,
     accounts: List<AccountState>,
     onCallBack: (accountId: String, number: String) -> Unit,
+    onOpenInDialer: (accountId: String?, number: String) -> Unit,
 ) {
     if (history.isEmpty()) {
-        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Text("No calls yet", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Column(Modifier.fillMaxSize()) {
+            ScreenTitle("Recents", Modifier.padding(horizontal = 16.dp))
+            EmptyState(
+                icon = R.drawable.ic_history_outlined,
+                title = "No calls yet",
+                text = "Calls you make and receive show up here.",
+                modifier = Modifier.weight(1f).fillMaxWidth(),
+            )
         }
         return
     }
@@ -61,7 +75,7 @@ fun RecentsScreen(
     val enabledIds = enabled.map { it.account.id }
     val groups = history.groupBy { dayLabel(context, it.startMillis) }
     LazyColumn(Modifier.fillMaxSize()) {
-        item { ScreenTitle("Recents", Modifier.padding(start = 16.dp, top = 16.dp, end = 16.dp)) }
+        item { ScreenTitle("Recents", Modifier.padding(horizontal = 16.dp)) }
         groups.forEach { (day, entries) ->
             item(key = "day-$day") {
                 Text(
@@ -73,11 +87,13 @@ fun RecentsScreen(
             }
             items(entries) { entry ->
                 // Call back through the same account when it is still enabled.
-                val accountId = entry.accountId?.takeIf { it in enabledIds } ?: enabledIds.firstOrNull()
+                val sameAccount = entry.accountId?.takeIf { it in enabledIds }
+                val accountId = sameAccount ?: enabledIds.firstOrNull()
                 val callable = entry.number.isNotEmpty()
                 RecentRow(
                     context = context,
                     entry = entry,
+                    onOpen = if (callable) ({ onOpenInDialer(sameAccount, entry.number) }) else null,
                     onCall = accountId?.takeIf { callable }?.let { { onCallBack(it, entry.number) } },
                     // Other accounts to call back through, for the menu.
                     others = if (callable) enabled.filter { it.account.id != accountId } else emptyList(),
@@ -92,6 +108,7 @@ fun RecentsScreen(
 private fun RecentRow(
     context: Context,
     entry: HistoryEntry,
+    onOpen: (() -> Unit)?,
     onCall: (() -> Unit)?,
     others: List<AccountState>,
     onCallVia: (accountId: String) -> Unit,
@@ -100,10 +117,11 @@ private fun RecentRow(
         if (entry.number.isNotEmpty() && entry.number != entry.name) add(entry.number)
         if (entry.accountLabel.isNotEmpty()) add(entry.accountLabel)
         add(DateUtils.formatDateTime(context, entry.startMillis, DateUtils.FORMAT_SHOW_TIME))
-        if (entry.durationSeconds > 0) add(formatDuration(entry.durationSeconds))
+        if (entry.durationSeconds > 0) add(formatDurationWords(entry.durationSeconds))
     }
     ListItem(
-        modifier = if (onCall != null) Modifier.clickable(onClick = onCall) else Modifier,
+        modifier = if (onOpen != null) Modifier.clickable(onClickLabel = "Show in dialer", onClick = onOpen) else Modifier,
+        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
         leadingContent = { DirectionIcon(entry) },
         headlineContent = {
             Text(
@@ -113,7 +131,7 @@ private fun RecentRow(
                 overflow = TextOverflow.Ellipsis,
             )
         },
-        supportingContent = { Text(details.joinToString(" · "), maxLines = 1, overflow = TextOverflow.Ellipsis) },
+        supportingContent = { Text(details.joinToString(" · "), maxLines = 2, overflow = TextOverflow.Ellipsis) },
         trailingContent = {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 if (onCall != null) {

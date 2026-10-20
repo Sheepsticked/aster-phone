@@ -1,7 +1,6 @@
 package app.asterphone.ui
 
 import androidx.annotation.DrawableRes
-import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
@@ -36,7 +35,6 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.HorizontalDivider
@@ -84,6 +82,7 @@ import app.asterphone.data.ContactDirectory
 import app.asterphone.data.SipAccount
 import app.asterphone.sip.AccountState
 import app.asterphone.sip.CallInfo
+import app.asterphone.sip.CallPhase
 import app.asterphone.sip.RegistrationStatus
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.launch
@@ -102,6 +101,8 @@ fun DialerScreen(
     onEditAccount: (String) -> Unit,
     contacts: ContactDirectory = ContactDirectory(emptyList()),
     onAllowContacts: (() -> Unit)? = null,
+    prefill: String? = null,
+    onPrefillConsumed: () -> Unit = {},
 ) {
     val usable = accounts.filter { it.account.enabled }
     val selected = usable.firstOrNull { it.account.id == selectedAccountId }
@@ -113,6 +114,14 @@ fun DialerScreen(
     val matches = remember(number.text, contacts) { contacts.search(number.text.toString()) }
     val fill: (String) -> Unit = { number.setTextAndPlaceCursorAtEnd(SipAccount.cleanNumber(it)) }
     val pickContact = rememberContactPicker(fill)
+    val haptics = rememberHaptics()
+    // A number sent from elsewhere, such as a Recents entry, lands in the field once.
+    LaunchedEffect(prefill) {
+        if (prefill != null) {
+            fill(prefill)
+            onPrefillConsumed()
+        }
+    }
 
     if (selected == null) {
         NoAccounts(anyAccounts = accounts.isNotEmpty(), onAddAccount = onAddAccount)
@@ -123,7 +132,7 @@ fun DialerScreen(
     BoxWithConstraints(Modifier.fillMaxSize()) {
         // Size the keys to the space left over; on very small screens the dialer scrolls instead.
         // The keypad and the call row are five rows of keys with gaps of 0.18 key between them.
-        val fixed = (if (call != null) 80.dp else 0.dp) + 230.dp
+        val fixed = (if (call != null) 80.dp else 0.dp) + 238.dp
         val keySize = ((maxHeight - fixed) / 5.72f).coerceIn(52.dp, 78.dp)
         Column(
             Modifier
@@ -141,7 +150,7 @@ fun DialerScreen(
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Spacer(Modifier.height(12.dp))
                 NumberField(number)
-                Box(Modifier.fillMaxWidth().height(64.dp), contentAlignment = Alignment.Center) {
+                Box(Modifier.fillMaxWidth().heightIn(min = 72.dp).padding(vertical = 8.dp), contentAlignment = Alignment.Center) {
                     val best = matches.firstOrNull()
                     when {
                         best != null -> ContactSuggestion(
@@ -163,7 +172,12 @@ fun DialerScreen(
                 Row(horizontalArrangement = Arrangement.spacedBy(keySize * 0.36f), verticalAlignment = Alignment.CenterVertically) {
                     RowButton("Contacts", R.drawable.ic_contacts, keySize, onClick = pickContact)
                     // With an empty field, the first press brings back the last number dialled.
-                    CallButton(enabled = call == null && (!empty || lastDialed != null), size = keySize) {
+                    CallButton(
+                        enabled = call == null && (!empty || lastDialed != null),
+                        size = keySize,
+                        description = if (empty && lastDialed != null) "Call last number" else "Call",
+                    ) {
+                        haptics.tap()
                         if (empty) lastDialed?.let(number::setTextAndPlaceCursorAtEnd)
                         else onDial(selected.account.id, SipAccount.cleanNumber(number.text.toString()))
                     }
@@ -171,7 +185,20 @@ fun DialerScreen(
                         Spacer(Modifier.size(keySize))
                     } else {
                         // Tap deletes one character; holding clears the number.
-                        RowButton("Delete", R.drawable.ic_backspace, keySize, onClick = number::deleteBack, onLongClick = number::clearText)
+                        RowButton(
+                            "Delete",
+                            R.drawable.ic_backspace,
+                            keySize,
+                            onClick = {
+                                haptics.tap()
+                                number.deleteBack()
+                            },
+                            onLongClick = {
+                                haptics.longPress()
+                                number.clearText()
+                            },
+                            onLongClickLabel = "Clear number",
+                        )
                     }
                 }
             }
@@ -213,24 +240,14 @@ private fun TextFieldState.deleteBack() = edit {
 
 @Composable
 private fun NoAccounts(anyAccounts: Boolean, onAddAccount: () -> Unit) {
-    Column(
-        Modifier.fillMaxSize().padding(32.dp),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Text(if (anyAccounts) "All accounts are off" else "No accounts yet", style = MaterialTheme.typography.headlineSmall)
-        Spacer(Modifier.height(8.dp))
-        Text(
-            if (anyAccounts) "Turn an account on in the Accounts tab to make calls."
-            else "Add your extension on the Aster server to start calling.",
-            textAlign = TextAlign.Center,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        if (!anyAccounts) {
-            Spacer(Modifier.height(16.dp))
-            Button(onClick = onAddAccount) { Text("Add account") }
-        }
-    }
+    EmptyState(
+        icon = R.drawable.ic_dialpad_outlined,
+        title = if (anyAccounts) "All accounts are off" else "No accounts yet",
+        text = if (anyAccounts) "Turn an account on in the Accounts tab to make calls." else "Add your extension on the Aster server to start calling.",
+        modifier = Modifier.fillMaxSize(),
+        actionLabel = if (anyAccounts) null else "Add account",
+        onAction = onAddAccount,
+    )
 }
 
 /** The SIP account calls go through, as a bar that opens the account list. */
@@ -243,7 +260,7 @@ private fun AccountSwitcher(state: AccountState, onClick: () -> Unit) {
         color = background,
         modifier = Modifier.fillMaxWidth().testTag("account-switcher"),
     ) {
-        Row(Modifier.height(56.dp).padding(start = 8.dp, end = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.heightIn(min = 56.dp).padding(horizontal = 8.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             AccountAvatar(state, selected = false, background = background)
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
@@ -369,40 +386,25 @@ private fun RowIcon(icon: @Composable () -> Unit) {
     Box(Modifier.size(40.dp), contentAlignment = Alignment.Center) { icon() }
 }
 
-/** The account's initial with its registration status as a small dot; [background] rings the dot. */
-@Composable
-private fun AccountAvatar(state: AccountState, selected: Boolean, background: Color) {
-    Box {
-        if (selected) {
-            Avatar(state.account.label, 40.dp, containerColor = MaterialTheme.colorScheme.primary, color = MaterialTheme.colorScheme.onPrimary)
-        } else {
-            Avatar(state.account.label, 40.dp)
-        }
-        Box(
-            Modifier
-                .align(Alignment.BottomEnd)
-                .size(14.dp)
-                .clip(CircleShape)
-                .background(background),
-            contentAlignment = Alignment.Center,
-        ) {
-            StatusDot(state.status)
-        }
-    }
-}
-
 @Composable
 private fun AccountState.statusColor(): Color =
     if (status == RegistrationStatus.Failed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
 
 /** A plain round icon button the size of a key, for the row beside the call button. */
 @Composable
-private fun RowButton(label: String, @DrawableRes icon: Int, size: Dp, onClick: () -> Unit, onLongClick: (() -> Unit)? = null) {
+private fun RowButton(
+    label: String,
+    @DrawableRes icon: Int,
+    size: Dp,
+    onClick: () -> Unit,
+    onLongClick: (() -> Unit)? = null,
+    onLongClickLabel: String? = null,
+) {
     Box(
         Modifier
             .size(size)
             .clip(CircleShape)
-            .combinedClickable(onClick = onClick, onLongClick = onLongClick)
+            .combinedClickable(onClick = onClick, onLongClick = onLongClick, onLongClickLabel = onLongClickLabel)
             .semantics {
                 contentDescription = label
                 role = Role.Button
@@ -414,7 +416,7 @@ private fun RowButton(label: String, @DrawableRes icon: Int, size: Dp, onClick: 
 }
 
 @Composable
-private fun CallButton(enabled: Boolean, size: Dp, onClick: () -> Unit) {
+private fun CallButton(enabled: Boolean, size: Dp, description: String, onClick: () -> Unit) {
     FilledIconButton(
         onClick = onClick,
         enabled = enabled,
@@ -426,7 +428,7 @@ private fun CallButton(enabled: Boolean, size: Dp, onClick: () -> Unit) {
             disabledContentColor = Color.White.copy(alpha = 0.85f),
         ),
     ) {
-        Icon(painterResource(R.drawable.ic_call), contentDescription = "Call", modifier = Modifier.size(32.dp))
+        Icon(painterResource(R.drawable.ic_call), contentDescription = description, modifier = Modifier.size(32.dp))
     }
 }
 
@@ -448,7 +450,7 @@ private fun NumberField(state: TextFieldState, modifier: Modifier = Modifier) {
         InterceptPlatformTextInput(interceptor = { _, _ -> awaitCancellation() }) {
             BasicTextField(
                 state = state,
-                modifier = Modifier.fillMaxWidth().focusRequester(focus).testTag("number"),
+                modifier = Modifier.fillMaxWidth().focusRequester(focus).semantics { contentDescription = "Number" }.testTag("number"),
                 lineLimits = TextFieldLineLimits.SingleLine,
                 textStyle = (if (text.length > 14) MaterialTheme.typography.headlineSmall else MaterialTheme.typography.headlineMedium)
                     .copy(textAlign = TextAlign.Center, color = MaterialTheme.colorScheme.onSurface),
@@ -460,9 +462,15 @@ private fun NumberField(state: TextFieldState, modifier: Modifier = Modifier) {
 
 @Composable
 private fun ActiveCallBanner(call: CallInfo, onOpenCall: () -> Unit) {
+    val seconds = rememberElapsedSeconds(call.connectedAt)
+    val text = when {
+        call.phase == CallPhase.OnHold -> "Call on hold · Back to call"
+        seconds != null -> "Back to call · ${formatDuration(seconds)}"
+        else -> "Back to call"
+    }
     Surface(
         onClick = onOpenCall,
-        color = CallGreen,
+        color = CallBannerGreen,
         contentColor = Color.White,
         shape = RoundedCornerShape(16.dp),
         modifier = Modifier.fillMaxWidth(),
@@ -470,7 +478,7 @@ private fun ActiveCallBanner(call: CallInfo, onOpenCall: () -> Unit) {
         Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
             Icon(Icons.Filled.Call, contentDescription = null)
             Spacer(Modifier.width(12.dp))
-            Text("Back to call with ${call.name}", style = MaterialTheme.typography.titleMedium)
+            Text(text, style = MaterialTheme.typography.titleMedium)
         }
     }
 }

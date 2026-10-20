@@ -1,6 +1,12 @@
 package app.asterphone.ui
 
+import android.icu.text.MeasureFormat
+import android.icu.util.Measure
+import android.icu.util.MeasureUnit
 import android.icu.util.ULocale
+import android.os.SystemClock
+import android.view.HapticFeedbackConstants
+import android.view.View
 import androidx.annotation.DrawableRes
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -11,10 +17,12 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material3.Button
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.FilledIconToggleButton
 import androidx.compose.material3.Icon
@@ -22,19 +30,28 @@ import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import app.asterphone.sip.AccountState
 import app.asterphone.sip.RegistrationStatus
+import kotlinx.coroutines.delay
+import java.util.Locale
 
 @Composable
 fun StatusDot(status: RegistrationStatus, modifier: Modifier = Modifier) {
@@ -64,15 +81,88 @@ fun AccountStatus(state: AccountState, modifier: Modifier = Modifier, style: Tex
     }
 }
 
-/** Large heading at the top of a tab. */
+/** Large heading at the top of a tab; the screen supplies the side padding. */
 @Composable
 fun ScreenTitle(text: String, modifier: Modifier = Modifier) {
-    Text(text, style = MaterialTheme.typography.headlineSmall, modifier = modifier)
+    Text(text, style = MaterialTheme.typography.headlineSmall, modifier = modifier.padding(top = 16.dp, bottom = 4.dp))
 }
 
+/** A call timer such as "2:05" or "1:02:05". */
 fun formatDuration(seconds: Int): String =
     if (seconds >= 3600) "%d:%02d:%02d".format(seconds / 3600, seconds / 60 % 60, seconds % 60)
     else "%d:%02d".format(seconds / 60, seconds % 60)
+
+/** A call length in words, such as "2 min, 5 sec" or "1 hr, 2 min", so it isn't mistaken for a time of day. */
+fun formatDurationWords(seconds: Int, locale: Locale = Locale.getDefault()): String {
+    val hours = seconds / 3600
+    val minutes = seconds / 60 % 60
+    val secs = seconds % 60
+    // Seconds are left out once a call lasts an hour.
+    val parts = when {
+        hours > 0 -> listOf(Measure(hours, MeasureUnit.HOUR), Measure(minutes, MeasureUnit.MINUTE))
+        minutes > 0 -> listOf(Measure(minutes, MeasureUnit.MINUTE), Measure(secs, MeasureUnit.SECOND))
+        else -> listOf(Measure(secs, MeasureUnit.SECOND))
+    }.filter { it.number.toInt() > 0 }
+    // Non-breaking spaces keep the whole length on one line when a row wraps.
+    return MeasureFormat.getInstance(locale, MeasureFormat.FormatWidth.SHORT).formatMeasures(*parts.toTypedArray()).replace(' ', '\u00A0')
+}
+
+/** Whole seconds since [since] (an elapsed-realtime stamp), counted up live; null when there is no start yet. */
+@Composable
+fun rememberElapsedSeconds(since: Long?): Int? {
+    var now by remember { mutableLongStateOf(SystemClock.elapsedRealtime()) }
+    LaunchedEffect(since) {
+        while (since != null) {
+            now = SystemClock.elapsedRealtime()
+            delay(1000)
+        }
+    }
+    return since?.let { ((now - it) / 1000).toInt().coerceAtLeast(0) }
+}
+
+/** Key feedback through the view, which follows the system's touch-feedback setting. */
+class Haptics(private val view: View) {
+    fun tap() {
+        view.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
+    }
+
+    fun longPress() {
+        view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+    }
+}
+
+@Composable
+fun rememberHaptics(): Haptics {
+    val view = LocalView.current
+    return remember(view) { Haptics(view) }
+}
+
+/** What a list or screen shows when it has nothing yet: an icon, a title, a line of text and an optional button. */
+@Composable
+fun EmptyState(
+    @DrawableRes icon: Int,
+    title: String,
+    text: String,
+    modifier: Modifier = Modifier,
+    actionLabel: String? = null,
+    onAction: () -> Unit = {},
+) {
+    Column(
+        modifier.padding(32.dp),
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Icon(painterResource(icon), contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(48.dp))
+        Spacer(Modifier.height(16.dp))
+        Text(title, style = MaterialTheme.typography.titleLarge, textAlign = TextAlign.Center)
+        Spacer(Modifier.height(8.dp))
+        Text(text, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
+        if (actionLabel != null) {
+            Spacer(Modifier.height(16.dp))
+            Button(onClick = onAction) { Text(actionLabel) }
+        }
+    }
+}
 
 /** A circle with the first letter of [name], or a person icon for numbers. */
 @Composable
@@ -97,6 +187,28 @@ fun Avatar(
     }
 }
 
+/** The account's initial with its registration status as a small dot; [background] rings the dot. */
+@Composable
+fun AccountAvatar(state: AccountState, selected: Boolean, background: Color) {
+    Box {
+        if (selected) {
+            Avatar(state.account.label, 40.dp, containerColor = MaterialTheme.colorScheme.primary, color = MaterialTheme.colorScheme.onPrimary)
+        } else {
+            Avatar(state.account.label, 40.dp)
+        }
+        Box(
+            Modifier
+                .align(Alignment.BottomEnd)
+                .size(14.dp)
+                .clip(CircleShape)
+                .background(background),
+            contentAlignment = Alignment.Center,
+        ) {
+            StatusDot(state.status)
+        }
+    }
+}
+
 /** A large round button with a label underneath, as used for answer, decline and hang up. */
 @Composable
 fun RoundAction(label: String, @DrawableRes icon: Int, color: Color, onClick: () -> Unit, size: Dp = 72.dp) {
@@ -109,7 +221,8 @@ fun RoundAction(label: String, @DrawableRes icon: Int, color: Color, onClick: ()
             Icon(painterResource(icon), contentDescription = label, modifier = Modifier.size(size * 0.44f))
         }
         Spacer(Modifier.height(6.dp))
-        Text(label, style = MaterialTheme.typography.labelLarge)
+        // The icon's description already says this; reading the visible text too would repeat it.
+        Text(label, style = MaterialTheme.typography.labelLarge, modifier = Modifier.clearAndSetSemantics {})
     }
 }
 
@@ -131,7 +244,7 @@ fun RoundToggle(label: String, @DrawableRes icon: Int, checked: Boolean, onToggl
             Icon(painterResource(icon), contentDescription = label, modifier = Modifier.size(28.dp))
         }
         Spacer(Modifier.height(6.dp))
-        Text(label, style = MaterialTheme.typography.labelLarge)
+        Text(label, style = MaterialTheme.typography.labelLarge, modifier = Modifier.clearAndSetSemantics {})
     }
 }
 
@@ -151,6 +264,7 @@ fun DialPad(onKey: (Char) -> Unit, modifier: Modifier = Modifier, allowPlus: Boo
     // Phones in Cyrillic-script languages print both alphabets; small keys have room for one line only.
     val locale = LocalConfiguration.current.locales[0]
     val cyrillic = remember(locale) { ULocale.addLikelySubtags(ULocale.forLocale(locale)).script == "Cyrl" } && keySize >= 64.dp
+    val haptics = rememberHaptics()
     Column(modifier, verticalArrangement = Arrangement.spacedBy(keySize * 0.18f)) {
         for (row in KEYS) {
             Row(horizontalArrangement = Arrangement.spacedBy(keySize * 0.36f)) {
@@ -161,8 +275,15 @@ fun DialPad(onKey: (Char) -> Unit, modifier: Modifier = Modifier, allowPlus: Boo
                         letters = if (plus) "+" else LETTERS[key].orEmpty(),
                         secondLetters = if (cyrillic) CYRILLIC_LETTERS[key].orEmpty() else "",
                         size = keySize,
-                        onClick = { onKey(key) },
-                        onLongClick = if (plus) ({ onKey('+') }) else null,
+                        onClick = {
+                            haptics.tap()
+                            onKey(key)
+                        },
+                        onLongClick = if (plus) ({
+                            haptics.longPress()
+                            onKey('+')
+                        }) else null,
+                        longClickLabel = if (plus) "Type plus" else null,
                     )
                 }
             }
@@ -172,13 +293,21 @@ fun DialPad(onKey: (Char) -> Unit, modifier: Modifier = Modifier, allowPlus: Boo
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun DialKey(key: Char, letters: String, secondLetters: String, size: Dp, onClick: () -> Unit, onLongClick: (() -> Unit)?) {
+private fun DialKey(
+    key: Char,
+    letters: String,
+    secondLetters: String,
+    size: Dp,
+    onClick: () -> Unit,
+    onLongClick: (() -> Unit)?,
+    longClickLabel: String?,
+) {
     Box(
         Modifier
             .size(size)
             .clip(CircleShape)
             .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-            .combinedClickable(onClick = onClick, onLongClick = onLongClick)
+            .combinedClickable(onClick = onClick, onLongClick = onLongClick, onLongClickLabel = longClickLabel)
             .testTag("key-$key"),
         contentAlignment = Alignment.Center,
     ) {

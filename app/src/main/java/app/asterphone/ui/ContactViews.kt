@@ -14,7 +14,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
@@ -60,10 +60,10 @@ fun ContactSuggestion(match: ContactMatch, more: Int, onPick: () -> Unit, onMore
     Surface(
         onClick = onPick,
         shape = RoundedCornerShape(16.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
-        modifier = modifier.fillMaxWidth().height(56.dp).testTag("suggestion"),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        modifier = modifier.fillMaxWidth().heightIn(min = 56.dp).testTag("suggestion"),
     ) {
-        Row(Modifier.padding(start = 8.dp, end = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.padding(start = 8.dp, end = 4.dp, top = 8.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             Avatar(match.contact.name, 40.dp)
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
@@ -135,15 +135,15 @@ private fun highlight() = SpanStyle(color = MaterialTheme.colorScheme.primary, f
 @Composable
 private fun name(match: ContactMatch): AnnotatedString = highlighted(match.contact.name, match.nameRange, highlight())
 
-/** "Mobile · +1 234…", with the typed digits picked out. */
+/** "+1 234… · Mobile", with the typed digits picked out; the label comes last so a long line cuts it, not the digits. */
 @Composable
 private fun numberLine(match: ContactMatch): AnnotatedString {
     val number = highlighted(match.contact.number, match.numberRange, highlight())
     if (match.contact.type.isEmpty()) return number
     return buildAnnotatedString {
-        append(match.contact.type)
-        append(" · ")
         append(number)
+        append(" · ")
+        append(match.contact.type)
     }
 }
 

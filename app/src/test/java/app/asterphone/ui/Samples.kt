@@ -40,16 +40,22 @@ object Samples {
     private fun at(daysAgo: Long, hour: Int, minute: Int): Long =
         LocalDate.now().minusDays(daysAgo).atTime(hour, minute).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
 
-    val incoming = CallInfo("Reception", "600", "Office", incoming = true, phase = CallPhase.Ringing, connectedAt = null, muted = false, speaker = false)
+    val incoming = CallInfo(
+        "Reception", "600", "Office", incoming = true, phase = CallPhase.Ringing, connectedAt = null, muted = false, speaker = false,
+        accountId = "a1", accountExtension = "501",
+    )
 
     val connected = CallInfo(
         "+1234567890", "+1234567890", "GSM line", incoming = false, phase = CallPhase.Connected,
         connectedAt = SystemClock.elapsedRealtime() - 83_000, muted = true, speaker = false,
+        accountId = "a2", accountExtension = "502",
     )
+
+    val onHold = connected.copy(phase = CallPhase.OnHold)
 
     val failed = CallInfo(
         "999", "999", "Office", incoming = false, phase = CallPhase.Ended, connectedAt = null, muted = false, speaker = false,
-        endReason = "Number not found · SIP 404 Not Found",
+        endReason = "Number not found · SIP 404 Not Found", accountId = "a1", accountExtension = "501",
     )
 
     /** Contacts with numbers from ranges reserved for fiction. */
@@ -65,8 +71,8 @@ object Samples {
         SetupCheck("Notifications", "Shows incoming calls, missed calls and connection problems.", true, true, "Allow") {},
         SetupCheck("Microphone", "Lets the other side hear you.", true, true, "Allow") {},
         SetupCheck("Run in background", "Keeps the app connected so calls arrive while the screen is off.", false, true, "Allow") {},
+        SetupCheck("Samsung: Never sleeping apps", "Settings → Battery → Background usage limits → Never sleeping apps.", null, false, "Open app info") {},
         SetupCheck("Full-screen calls", "Shows the call screen over the lock screen.", true, true, "Allow") {},
         SetupCheck("Bluetooth headsets", "Optional: lets calls use a Bluetooth headset.", false, false, "Allow") {},
-        SetupCheck("Samsung: never sleeping", "Settings → Battery → Background usage limits → Never sleeping apps.", null, false, "Open app info") {},
     )
 }

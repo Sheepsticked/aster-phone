@@ -29,6 +29,7 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -169,6 +170,19 @@ private fun buildChecks(
         },
     )
 
+    if (Build.MANUFACTURER.equals("samsung", ignoreCase = true)) {
+        add(
+            SetupCheck(
+                "Samsung: Never sleeping apps",
+                "Settings → Battery → Background usage limits → Never sleeping apps → + → Aster Phone. " +
+                    "Also check app info → Battery is Unrestricted. The app can't check this for you.",
+                null,
+                false,
+                "Open app info",
+            ) { openSettings(appDetails(context)) },
+        )
+    }
+
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
         val fullScreenOk = context.getSystemService(NotificationManager::class.java).canUseFullScreenIntent()
         add(
@@ -210,19 +224,6 @@ private fun buildChecks(
             "Allow",
         ) { requestPermission(Manifest.permission.READ_CONTACTS) },
     )
-
-    if (Build.MANUFACTURER.equals("samsung", ignoreCase = true)) {
-        add(
-            SetupCheck(
-                "Samsung: never sleeping",
-                "Settings → Battery → Background usage limits → Never sleeping apps → + → Aster Phone. " +
-                    "Also check app info → Battery is Unrestricted. The app can't check this for you.",
-                null,
-                false,
-                "Open app info",
-            ) { openSettings(appDetails(context)) },
-        )
-    }
 }
 
 private fun appDetails(context: Context) =
@@ -247,9 +248,9 @@ fun SetupScreen(
     onDetailedLog: (Boolean) -> Unit,
 ) {
     val todo = checks.count { it.needsAction }
-    LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    LazyColumn(contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item {
-            Text("Background setup", style = MaterialTheme.typography.headlineSmall)
+            ScreenTitle("Setup")
             Text(
                 if (todo == 0) "All set. Calls can arrive while the phone sleeps."
                 else "$todo ${if (todo == 1) "step needs" else "steps need"} attention so calls arrive while the phone sleeps.",
@@ -318,7 +319,13 @@ private fun CheckCard(check: SetupCheck) {
                 if (check.ok != true) {
                     Spacer(Modifier.height(8.dp))
                     if (check.needsAction) {
-                        Button(onClick = check.action) { Text(check.actionLabel) }
+                        Button(
+                            onClick = check.action,
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.error,
+                                contentColor = MaterialTheme.colorScheme.onError,
+                            ),
+                        ) { Text(check.actionLabel) }
                     } else {
                         OutlinedButton(onClick = check.action) { Text(check.actionLabel) }
                     }

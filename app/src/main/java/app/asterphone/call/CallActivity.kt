@@ -5,6 +5,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Bundle
 import android.os.PowerManager
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -69,6 +70,8 @@ class CallActivity : ComponentActivity() {
                     onSpeaker = SipEngine::setSpeaker,
                     onHold = SipEngine::setHeld,
                     onDtmf = SipEngine::sendDtmf,
+                    onClose = ::finish,
+                    onCallAgain = { shown?.let(::callAgain) },
                 )
             }
         }
@@ -82,6 +85,13 @@ class CallActivity : ComponentActivity() {
     override fun onDestroy() {
         setProximity(false)
         super.onDestroy()
+    }
+
+    /** Calls the number of a failed call again through the same account. */
+    private fun callAgain(call: CallInfo) {
+        val accountId = call.accountId
+        val error = if (accountId == null) "Choose an account" else SipEngine.dial(accountId, call.number)
+        if (error != null) Toast.makeText(this, error, Toast.LENGTH_SHORT).show()
     }
 
     private fun handle(intent: Intent?) {
@@ -121,7 +131,7 @@ class CallActivity : ComponentActivity() {
         const val ACTION_SHOW = "app.asterphone.action.SHOW_CALL"
         const val ACTION_ANSWER = "app.asterphone.action.ANSWER"
         private const val ENDED_SCREEN_MILLIS = 1200L
-        private const val FAILED_SCREEN_MILLIS = 4000L
+        private const val FAILED_SCREEN_MILLIS = 10_000L
         private const val MAX_CALL_MILLIS = 4 * 60 * 60 * 1000L
     }
 }

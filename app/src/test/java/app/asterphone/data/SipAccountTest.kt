@@ -55,4 +55,17 @@ class SipAccountTest {
         val bad = account.copy(username = "5 01", password = "", host = "sip:pbx", port = 0, expirySeconds = 10)
         assertEquals(5, bad.validate().size)
     }
+
+    @Test
+    fun fieldErrorsNameTheFieldThatIsWrong() {
+        val bad = account.copy(password = "", port = 70_000)
+        assertEquals(setOf(AccountField.Password, AccountField.Port), bad.fieldErrors().keys)
+        assertEquals("Password is required", bad.fieldErrors().getValue(AccountField.Password))
+        assertTrue(account.fieldErrors().isEmpty())
+    }
+
+    @Test
+    fun summaryListsExtensionTransportAndServer() {
+        assertEquals("501 · UDP · 192.0.2.10:5060", account.summary)
+    }
 }

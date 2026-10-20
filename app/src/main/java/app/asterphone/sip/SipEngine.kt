@@ -43,6 +43,9 @@ data class CallInfo(
     val speaker: Boolean,
     /** Why the call ended, when it wasn't a normal hang-up. */
     val endReason: String? = null,
+    /** The account the call goes through, and its extension, when known. */
+    val accountId: String? = null,
+    val accountExtension: String = "",
 )
 
 data class HistoryEntry(
@@ -449,16 +452,19 @@ object SipEngine {
             Call.State.Pausing, Call.State.Paused -> CallPhase.OnHold
             else -> CallPhase.Connected
         }
+        val account = accountFor(call)
         return CallInfo(
             name = name,
             number = number,
-            accountLabel = accountFor(call)?.label.orEmpty(),
+            accountLabel = account?.label.orEmpty(),
             incoming = call.dir == Call.Dir.Incoming,
             phase = phase,
             connectedAt = if (phase == CallPhase.Connected || phase == CallPhase.OnHold) connectedAt else null,
             muted = call.microphoneMuted,
             speaker = call.outputAudioDevice?.type == AudioDevice.Type.Speaker,
             endReason = if (phase == CallPhase.Ended) endReason else null,
+            accountId = account?.id,
+            accountExtension = account?.username.orEmpty(),
         )
     }
 

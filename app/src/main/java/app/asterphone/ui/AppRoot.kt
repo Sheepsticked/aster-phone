@@ -27,6 +27,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.asterphone.Notifications
@@ -58,6 +60,8 @@ fun AppRoot(store: AccountStore, requestedTab: Tab?, onTabHandled: () -> Unit, o
     val contacts by PhoneContacts.directory.collectAsStateWithLifecycle()
     var tab by rememberSaveable { mutableStateOf(Tab.Dial) }
     var editingId by rememberSaveable { mutableStateOf<String?>(null) }
+    // A number to show in the dialer, set by tapping a Recents entry.
+    var dialerNumber by rememberSaveable { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
 
@@ -136,13 +140,25 @@ fun AppRoot(store: AccountStore, requestedTab: Tab?, onTabHandled: () -> Unit, o
                     onEditAccount = { editingId = it },
                     contacts = contacts,
                     onAllowContacts = if (contactsAllowed || contactsAsked) null else ({ contactsPermission.launch(Manifest.permission.READ_CONTACTS) }),
+                    prefill = dialerNumber,
+                    onPrefillConsumed = { dialerNumber = null },
                 )
-                Tab.Recents -> RecentsScreen(history = history, accounts = accounts, onCallBack = dial)
+                Tab.Recents -> RecentsScreen(
+                    history = history,
+                    accounts = accounts,
+                    onCallBack = dial,
+                    onOpenInDialer = { accountId, number ->
+                        accountId?.let(SipEngine::setDialAccount)
+                        dialerNumber = number
+                        tab = Tab.Dial
+                    },
+                )
                 Tab.Accounts -> AccountsScreen(
                     accounts = accounts,
                     onAdd = { editingId = NEW_ACCOUNT },
                     onEdit = { editingId = it },
                     onToggle = { id, enabled -> scope.launch { store.setEnabled(id, enabled) } },
+                    onRegisterAgain = SipEngine::refreshRegistrations,
                 )
                 Tab.Setup -> SetupScreen(
                     checks = checks,
@@ -164,7 +180,7 @@ fun AppNavigationBar(tab: Tab, onSelect: (Tab) -> Unit, setupNeedsAction: Boolea
                 selected = tab == item,
                 onClick = { onSelect(item) },
                 icon = {
-                    BadgedBox(badge = { if (badge) Badge() }) {
+                    BadgedBox(badge = { if (badge) Badge(Modifier.semantics { stateDescription = "Needs attention" }) }) {
                         Icon(painterResource(if (tab == item) item.selectedIcon else item.icon), contentDescription = null)
                     }
                 },

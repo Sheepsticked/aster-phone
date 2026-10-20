@@ -5,6 +5,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
@@ -58,9 +60,11 @@ class DialerScreenTest {
         lastDialed: String? = null,
         contacts: ContactDirectory = ContactDirectory(emptyList()),
         askForContacts: Boolean = false,
+        prefill: String? = null,
     ) {
         compose.setContent {
             var selected by remember { mutableStateOf(remembered) }
+            var pending by remember { mutableStateOf(prefill) }
             AsterPhoneTheme {
                 DialerScreen(
                     accounts = accounts,
@@ -78,6 +82,8 @@ class DialerScreenTest {
                     onEditAccount = { edited += it },
                     contacts = contacts,
                     onAllowContacts = if (askForContacts) ({ contactsRequested = true }) else null,
+                    prefill = pending,
+                    onPrefillConsumed = { pending = null },
                 )
             }
         }
@@ -89,6 +95,11 @@ class DialerScreenTest {
 
     private fun assertAccount(label: String, status: String) =
         compose.onNodeWithTag("account-switcher").assert(hasText(label)).assert(hasText(status, substring = true))
+
+    private fun hasLongClickLabel(label: String) =
+        SemanticsMatcher("has long-click label $label") {
+            SemanticsActions.OnLongClick in it.config && it.config[SemanticsActions.OnLongClick].label == label
+        }
 
     private fun openAccounts() = compose.onNodeWithContentDescription("Change account").performClick()
 
@@ -190,11 +201,44 @@ class DialerScreenTest {
     @Test
     fun callWithAnEmptyFieldBringsBackTheLastNumber() {
         show(lastDialed = "600")
-        compose.onNodeWithContentDescription("Call").performClick()
+        compose.onNodeWithContentDescription("Call last number").performClick()
         assertNumber("600")
         assertTrue(dialed.isEmpty())
         compose.onNodeWithContentDescription("Call").performClick()
         assertEquals(listOf("a1" to "600"), dialed)
+    }
+
+    @Test
+    fun theCallButtonIsOnlyCalledCallLastNumberWhileTheFieldIsEmpty() {
+        show(lastDialed = "600")
+        compose.onNodeWithContentDescription("Call").assertDoesNotExist()
+        press("5")
+        compose.onNodeWithContentDescription("Call last number").assertDoesNotExist()
+        compose.onNodeWithContentDescription("Call").assertExists()
+    }
+
+    @Test
+    fun aNumberFromElsewhereLandsInTheFieldWithoutCalling() {
+        show(prefill = "+1 (234) 567-890")
+        assertNumber("+1234567890")
+        assertTrue(dialed.isEmpty())
+    }
+
+    @Test
+    fun aPrefilledNumberCanBeEditedAndCalled() {
+        show(prefill = "600")
+        press("1")
+        compose.onNodeWithContentDescription("Call").performClick()
+        assertEquals(listOf("a1" to "6001"), dialed)
+    }
+
+    @Test
+    fun theNumberFieldAndKeyActionsHaveSpokenNames() {
+        show()
+        compose.onNodeWithContentDescription("Number").assertExists()
+        compose.onNodeWithTag("key-0").assert(hasLongClickLabel("Type plus"))
+        press("12")
+        compose.onNodeWithContentDescription("Delete").assert(hasLongClickLabel("Clear number"))
     }
 
     @Test
@@ -282,7 +326,19 @@ class DialerScreenTest {
         show(call = Samples.connected)
         press("7")
         compose.onNodeWithContentDescription("Call").assertIsNotEnabled()
-        compose.onNodeWithText("Back to call with +1234567890").assertExists()
+        compose.onNodeWithText("Back to call", substring = true).assertExists()
+    }
+
+    @Test
+    fun theCallBannerShowsTheTimerAndTheHoldState() {
+        show(call = Samples.connected)
+        compose.onNodeWithText("Back to call · 1:2", substring = true).assertExists()
+    }
+
+    @Test
+    fun theCallBannerSaysWhenTheCallIsOnHold() {
+        show(call = Samples.onHold)
+        compose.onNodeWithText("Call on hold · Back to call").assertExists()
     }
 
     @Test

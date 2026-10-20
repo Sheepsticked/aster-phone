@@ -10,6 +10,7 @@ import androidx.compose.ui.test.performClick
 import app.asterphone.sip.AccountState
 import app.asterphone.sip.HistoryEntry
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -24,9 +25,19 @@ class RecentsScreenTest {
     val compose = createComposeRule()
 
     private val calls = mutableListOf<Pair<String, String>>()
+    private val opened = mutableListOf<Pair<String?, String>>()
 
     private fun show(history: List<HistoryEntry>, accounts: List<AccountState> = Samples.accounts) {
-        compose.setContent { AsterPhoneTheme { RecentsScreen(history, accounts) { account, number -> calls += account to number } } }
+        compose.setContent {
+            AsterPhoneTheme {
+                RecentsScreen(
+                    history,
+                    accounts,
+                    onCallBack = { account, number -> calls += account to number },
+                    onOpenInDialer = { account, number -> opened += account to number },
+                )
+            }
+        }
     }
 
     @Test
@@ -40,18 +51,59 @@ class RecentsScreenTest {
     }
 
     @Test
-    fun tappingARowCallsBackThroughTheSameAccount() {
+    fun tappingARowOpensItInTheDialerWithoutCalling() {
         show(Samples.history())
         compose.onNodeWithText("+1234567890").performClick()
-        assertEquals(listOf("a2" to "+1234567890"), calls)
+        assertEquals(listOf<Pair<String?, String>>("a2" to "+1234567890"), opened)
+        assertTrue(calls.isEmpty())
     }
 
     @Test
-    fun fallsBackToAnEnabledAccountWhenTheOriginalIsOff() {
+    fun thePhoneIconCallsBackThroughTheSameAccountAtOnce() {
+        show(Samples.history())
+        compose.onAllNodesWithContentDescription("Call back")[1].performClick()
+        assertEquals(listOf("a2" to "+1234567890"), calls)
+        assertTrue(opened.isEmpty())
+    }
+
+    @Test
+    fun anAccountThatIsOffIsNotSentToTheDialer() {
         val entry = HistoryEntry("700", "700", "a3", "", incoming = true, missed = false, startMillis = System.currentTimeMillis(), durationSeconds = 5)
         show(listOf(entry))
         compose.onNodeWithText("700").performClick()
+        assertEquals(listOf<Pair<String?, String>>(null to "700"), opened)
+    }
+
+    @Test
+    fun anAccountThatIsGoneIsNotSentToTheDialer() {
+        val entry = HistoryEntry("700", "700", "deleted", "", incoming = true, missed = false, startMillis = System.currentTimeMillis(), durationSeconds = 5)
+        show(listOf(entry))
+        compose.onNodeWithText("700").performClick()
+        assertEquals(listOf<Pair<String?, String>>(null to "700"), opened)
+    }
+
+    @Test
+    fun theCallBackIconFallsBackToAnEnabledAccountWhenTheOriginalIsOff() {
+        val entry = HistoryEntry("700", "700", "a3", "", incoming = true, missed = false, startMillis = System.currentTimeMillis(), durationSeconds = 5)
+        show(listOf(entry))
+        compose.onNodeWithContentDescription("Call back").performClick()
         assertEquals(listOf("a1" to "700"), calls)
+    }
+
+    @Test
+    fun entriesWithoutANumberCannotBeOpened() {
+        val entry = HistoryEntry("Unknown", "", "a1", "Office", incoming = true, missed = true, startMillis = System.currentTimeMillis(), durationSeconds = 0)
+        show(listOf(entry))
+        compose.onNodeWithText("Unknown").performClick()
+        assertTrue(opened.isEmpty())
+        compose.onNodeWithContentDescription("Call back").assertDoesNotExist()
+    }
+
+    @Test
+    fun durationsAreSpelledOutNotWrittenAsClockTimes() {
+        show(Samples.history())
+        compose.onNodeWithText("2 min, 5 sec".replace(' ', '\u00A0'), substring = true).assertExists()
+        compose.onNodeWithText("1 hr, 2 min".replace(' ', '\u00A0'), substring = true).assertExists()
     }
 
     @Test
@@ -69,8 +121,9 @@ class RecentsScreenTest {
     }
 
     @Test
-    fun showsAnEmptyState() {
+    fun showsAnEmptyStateUnderItsTitle() {
         show(emptyList())
+        compose.onNodeWithText("Recents").assertExists()
         compose.onNodeWithText("No calls yet").assertExists()
     }
 }
