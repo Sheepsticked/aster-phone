@@ -104,9 +104,9 @@ class IconRenderTest {
         val themed = layer(R.drawable.ic_launcher_monochrome, Color.rgb(0x3F, 0x2B, 0x7A))
         save("icon-themed", icon(192, circle, solid(Color.rgb(0xE9, 0xDD, 0xFF)), themed))
 
-        // Debug builds override the adaptive icon with a slate background.
+        // Debug builds use white arms on a blue background.
         val debug = drawable(R.mipmap.ic_launcher) as AdaptiveIconDrawable
-        save("icon-debug", icon(192, circle, { size -> render(debug.background, size) }, foreground))
+        save("icon-debug", icon(192, circle, { size -> render(debug.background, size) }, { size -> render(debug.foreground, size) }))
     }
 
     @Test
@@ -124,29 +124,16 @@ class IconRenderTest {
         val foreground = layer(R.drawable.ic_launcher_foreground)(108 * px)
         val reach = farthestOpaqueDp(foreground, px)
         assertTrue("the mark reaches $reach dp from the centre", reach <= SAFE_ZONE_DP / 2)
-        assertEquals("flower is about 48 dp across", 24f, reach, 1f)
+        assertEquals("the mark reaches about 24 dp from the centre", 24f, reach, 1f)
     }
 
     @Test
-    fun monochromeLayerCutsOutTheHandset() {
+    fun monochromeLayerMatchesTheMark() {
         val px = 8
         val foreground = layer(R.drawable.ic_launcher_foreground)(108 * px)
         val mono = layer(R.drawable.ic_launcher_monochrome)(108 * px)
         assertEquals(farthestOpaqueDp(foreground, px), farthestOpaqueDp(mono, px), 0.5f)
-
-        val handset = (0 until foreground.height).flatMap { y -> (0 until foreground.width).map { x -> x to y } }
-            .filter { (x, y) -> isColour(foreground.getPixel(x, y), HANDSET) }
-        assertTrue("the handset is drawn", handset.size > 1_000)
-        val clear = handset.count { (x, y) -> Color.alpha(mono.getPixel(x, y)) < 0x20 }
-        assertTrue("the handset is cut out of the single-colour layer ($clear of ${handset.size})", clear > handset.size * 0.98)
-
-        val centre = 54 * px
-        assertTrue("the golden disc stays filled around the handset", Color.alpha(mono.getPixel(centre + 8 * px, centre)) > 0xE0)
     }
-
-    private fun isColour(pixel: Int, rgb: Int): Boolean =
-        Color.alpha(pixel) == 0xFF &&
-            abs(Color.red(pixel) - Color.red(rgb)) < 10 && abs(Color.green(pixel) - Color.green(rgb)) < 10 && abs(Color.blue(pixel) - Color.blue(rgb)) < 10
 
     /** Distance in dp from the viewport centre to the farthest pixel that is not transparent. */
     private fun farthestOpaqueDp(bitmap: Bitmap, px: Int): Float {
@@ -162,6 +149,5 @@ class IconRenderTest {
         const val SAFE_ZONE_DP = 66f
         const val SQUIRCLE_STEPS = 360
         val BACKDROP = Color.rgb(0xDD, 0xDD, 0xDD)
-        val HANDSET = Color.rgb(0x53, 0x36, 0x95)
     }
 }

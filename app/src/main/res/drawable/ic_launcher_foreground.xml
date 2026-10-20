@@ -1,17 +1,22 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- An aster flower that doubles as an asterisk: eight petals around a golden centre with a handset. -->
+<!-- The Aster logo: white joined arms and blue detached arms. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <path
-        android:fillColor="#FFFFFF"
-        android:pathData="M49.8,46.1L49.8,34.2A4.2,4.2 0 0 1 58.2,34.2L58.2,46.1ZM56.62,45.44L65.03,37.03A4.2,4.2 0 0 1 70.97,42.97L62.56,51.38ZM61.9,49.8L73.8,49.8A4.2,4.2 0 0 1 73.8,58.2L61.9,58.2ZM62.56,56.62L70.97,65.03A4.2,4.2 0 0 1 65.03,70.97L56.62,62.56ZM58.2,61.9L58.2,73.8A4.2,4.2 0 0 1 49.8,73.8L49.8,61.9ZM51.38,62.56L42.97,70.97A4.2,4.2 0 0 1 37.03,65.03L45.44,56.62ZM46.1,58.2L34.2,58.2A4.2,4.2 0 0 1 34.2,49.8L46.1,49.8ZM45.44,51.38L37.03,42.97A4.2,4.2 0 0 1 42.97,37.03L51.38,45.44Z" />
-    <path
-        android:fillColor="#F6C344"
-        android:pathData="M45,54A9,9 0 1 1 63,54A9,9 0 1 1 45,54Z" />
-    <path
-        android:fillColor="#533695"
-        android:pathData="M58.97,56.1C58.2,56.1 57.47,55.97 56.78,55.75C56.56,55.67 56.32,55.73 56.15,55.9L55.18,57.12C53.42,56.28 51.78,54.7 50.91,52.88L52.12,51.85C52.28,51.68 52.33,51.44 52.26,51.22C52.03,50.53 51.92,49.8 51.92,49.03C51.92,48.7 51.64,48.42 51.3,48.42L49.16,48.42C48.82,48.42 48.42,48.57 48.42,49.03C48.42,54.79 53.21,59.58 58.97,59.58C59.41,59.58 59.58,59.19 59.58,58.85L59.58,56.71C59.58,56.37 59.3,56.1 58.97,56.1Z" />
+    <group android:translateX="29.25" android:translateY="29.25" android:scaleX="0.495" android:scaleY="0.495">
+        <path
+            android:fillColor="@android:color/transparent"
+            android:strokeColor="#FFFFFF"
+            android:strokeWidth="13"
+            android:strokeLineCap="round"
+            android:pathData="M50,50 L50,8 M50,50 L13.6,71 M50,50 L86.4,71" />
+        <path
+            android:fillColor="@android:color/transparent"
+            android:strokeColor="#38BDF8"
+            android:strokeWidth="13"
+            android:strokeLineCap="round"
+            android:pathData="M50,69 L50,92 M33.5,40.5 L13.6,29 M66.5,40.5 L86.4,29" />
+    </group>
 </vector>
