@@ -27,7 +27,9 @@ import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.text.TextRange
 import app.asterphone.data.ContactDirectory
+import app.asterphone.data.AsterModem
 import app.asterphone.data.PhoneContact
+import app.asterphone.data.SimLine
 import app.asterphone.data.SipAccount
 import app.asterphone.sip.AccountState
 import app.asterphone.sip.CallInfo
@@ -52,6 +54,7 @@ class DialerScreenTest {
     private var addClicked = false
     private var manageClicked = false
     private var contactsRequested = false
+    private val openedSimLines = mutableListOf<SimLine>()
 
     private fun show(
         accounts: List<AccountState> = Samples.accounts,
@@ -61,6 +64,7 @@ class DialerScreenTest {
         contacts: ContactDirectory = ContactDirectory(emptyList()),
         askForContacts: Boolean = false,
         prefill: String? = null,
+        simLine: SimLine? = null,
     ) {
         compose.setContent {
             var selected by remember { mutableStateOf(remembered) }
@@ -84,6 +88,8 @@ class DialerScreenTest {
                     onAllowContacts = if (askForContacts) ({ contactsRequested = true }) else null,
                     prefill = pending,
                     onPrefillConsumed = { pending = null },
+                    simLine = simLine,
+                    onOpenSimLine = { openedSimLines += it },
                 )
             }
         }
@@ -353,5 +359,49 @@ class DialerScreenTest {
         show(accounts = Samples.accounts.map { it.copy(account = it.account.copy(enabled = false), status = RegistrationStatus.Off) })
         compose.onNodeWithText("All accounts are off").assertExists()
         compose.onNodeWithText("Add account").assertDoesNotExist()
+    }
+
+    private val readySim = SimLine.Through(AsterModem("gsm1", "ready", "Example Mobile", "+1234567890"))
+    private val brokenSim = SimLine.Through(AsterModem("gsm1", "no-network", null, null))
+
+    @Test
+    fun showsNoSimLineUnlessThereIsOne() {
+        show()
+        compose.onNodeWithTag("sim-line").assertDoesNotExist()
+    }
+
+    @Test
+    fun showsWhichSimTheCallsGoOutThrough() {
+        show(simLine = readySim)
+        compose.onNodeWithTag("sim-line").assert(hasText("Calls go out through gsm1 · Example Mobile · +1234567890"))
+    }
+
+    @Test
+    fun saysWhenTheSimIsNotReady() {
+        show(simLine = brokenSim)
+        compose.onNodeWithTag("sim-line").assert(hasText("gsm1 is not ready (no network)"))
+    }
+
+    @Test
+    fun saysWhenCallsStayInside() {
+        show(simLine = SimLine.InternalOnly)
+        compose.onNodeWithTag("sim-line").assert(hasText("Internal calls only"))
+    }
+
+    @Test
+    fun tappingTheSimLineOpensIt() {
+        show(simLine = readySim)
+        compose.onNodeWithTag("sim-line").performClick()
+        assertEquals(listOf<SimLine>(readySim), openedSimLines)
+        assertEquals("/modems/gsm1", openedSimLines.single().path)
+    }
+
+    @Test
+    fun theSimLineDoesNotCostTheKeypad() {
+        show(simLine = readySim)
+        press("7")
+        assertNumber("7")
+        compose.onNodeWithContentDescription("Call").performClick()
+        assertEquals(listOf("a1" to "7"), dialed)
     }
 }

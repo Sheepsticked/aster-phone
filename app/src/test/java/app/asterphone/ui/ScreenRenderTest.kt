@@ -25,7 +25,9 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import app.asterphone.call.CallScreen
+import app.asterphone.data.AsterModem
 import app.asterphone.data.ContactDirectory
+import app.asterphone.data.SimLine
 import app.asterphone.sip.AccountState
 import app.asterphone.sip.CallInfo
 import app.asterphone.sip.HistoryEntry
@@ -90,6 +92,41 @@ class ScreenRenderTest {
     }
 
     @Test fun dialerNoAccounts() = render("dialer-empty") { App(Tab.Dial) { Dialer(emptyList()) } }
+
+    private val readySim = SimLine.Through(AsterModem("gsm1", "ready", "Example Mobile", "+1234567890"))
+    private val notReadySim = SimLine.Through(AsterModem("gsm1", "no-network", null, null))
+
+    @Test
+    @Config(qualifiers = "w384dp-h832dp-xxhdpi")
+    fun dialerSimReady() = render("dialer-sim-ready") { App(Tab.Dial) { Dialer(simLine = readySim) } }
+
+    @Test
+    @Config(qualifiers = "w384dp-h832dp-xxhdpi")
+    fun dialerSimReadyDark() = render("dialer-sim-ready-dark", dark = true) { App(Tab.Dial) { Dialer(simLine = readySim) } }
+
+    @Test
+    @Config(qualifiers = "w384dp-h832dp-xxhdpi")
+    fun dialerSimNotReady() = render("dialer-sim-not-ready") { App(Tab.Dial) { Dialer(simLine = notReadySim) } }
+
+    @Test
+    @Config(qualifiers = "w384dp-h832dp-xxhdpi")
+    fun dialerSimNotReadyDark() = render("dialer-sim-not-ready-dark", dark = true) { App(Tab.Dial) { Dialer(simLine = notReadySim) } }
+
+    @Test
+    @Config(qualifiers = "w384dp-h832dp-xxhdpi")
+    fun dialerSimInternal() = render("dialer-sim-internal") { App(Tab.Dial) { Dialer(simLine = SimLine.InternalOnly) } }
+
+    @Test
+    @Config(qualifiers = "w384dp-h832dp-xxhdpi")
+    fun dialerSimInternalDark() = render("dialer-sim-internal-dark", dark = true) { App(Tab.Dial) { Dialer(simLine = SimLine.InternalOnly) } }
+
+    @Test
+    @Config(qualifiers = "w384dp-h832dp-xxhdpi")
+    fun dialerSimLargeFont() = render("dialer-sim-large-font", fontScale = 1.3f) { App(Tab.Dial) { Dialer(simLine = readySim, call = Samples.connected) } }
+
+    @Test
+    @Config(qualifiers = "w360dp-h740dp-xhdpi")
+    fun dialerSimSmallPhone() = render("dialer-sim-small") { App(Tab.Dial) { Dialer(simLine = readySim) } }
 
     @Test fun recents() = render("recents") { App(Tab.Recents) { Recents(Samples.history()) } }
 
@@ -166,7 +203,8 @@ class ScreenRenderTest {
         call: CallInfo? = null,
         contacts: ContactDirectory = ContactDirectory(emptyList()),
         askForContacts: Boolean = false,
-    ) = DialerScreen(accounts, call, null, null, {}, { _, _ -> }, {}, {}, {}, {}, contacts, if (askForContacts) ({}) else null)
+        simLine: SimLine? = null,
+    ) = DialerScreen(accounts, call, null, null, {}, { _, _ -> }, {}, {}, {}, {}, contacts, if (askForContacts) ({}) else null, simLine = simLine)
 
     @Composable
     private fun Recents(history: List<HistoryEntry>) = RecentsScreen(history, Samples.accounts, { _, _ -> }, { _, _ -> })

@@ -79,6 +79,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import app.asterphone.R
 import app.asterphone.data.ContactDirectory
+import app.asterphone.data.SimLine
 import app.asterphone.data.SipAccount
 import app.asterphone.sip.AccountState
 import app.asterphone.sip.CallInfo
@@ -103,11 +104,11 @@ fun DialerScreen(
     onAllowContacts: (() -> Unit)? = null,
     prefill: String? = null,
     onPrefillConsumed: () -> Unit = {},
+    simLine: SimLine? = null,
+    onOpenSimLine: (SimLine) -> Unit = {},
 ) {
     val usable = accounts.filter { it.account.enabled }
-    val selected = usable.firstOrNull { it.account.id == selectedAccountId }
-        ?: usable.firstOrNull { it.status == RegistrationStatus.Registered }
-        ?: usable.firstOrNull()
+    val selected = dialerAccount(accounts, selectedAccountId)
     val number = rememberTextFieldState()
     var choosing by rememberSaveable { mutableStateOf(false) }
     var listingContacts by rememberSaveable { mutableStateOf(false) }
@@ -132,7 +133,7 @@ fun DialerScreen(
     BoxWithConstraints(Modifier.fillMaxSize()) {
         // Size the keys to the space left over; on very small screens the dialer scrolls instead.
         // The keypad and the call row are five rows of keys with gaps of 0.18 key between them.
-        val fixed = (if (call != null) 80.dp else 0.dp) + 238.dp
+        val fixed = (if (call != null) 80.dp else 0.dp) + (if (simLine != null) SIM_LINE_SPACE else 0.dp) + 238.dp
         val keySize = ((maxHeight - fixed) / 5.72f).coerceIn(52.dp, 78.dp)
         Column(
             Modifier
@@ -146,6 +147,7 @@ fun DialerScreen(
             Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (call != null) ActiveCallBanner(call, onOpenCall)
                 AccountSwitcher(selected) { choosing = true }
+                if (simLine != null) SimLineRow(simLine) { onOpenSimLine(simLine) }
             }
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Spacer(Modifier.height(12.dp))
@@ -220,6 +222,14 @@ fun DialerScreen(
     }
 }
 
+/** The account the dialer calls through: the chosen one if it is on, else one that is registered, else the first one that is on. */
+fun dialerAccount(accounts: List<AccountState>, selectedId: String?): AccountState? {
+    val usable = accounts.filter { it.account.enabled }
+    return usable.firstOrNull { it.account.id == selectedId }
+        ?: usable.firstOrNull { it.status == RegistrationStatus.Registered }
+        ?: usable.firstOrNull()
+}
+
 /** Types [key] at the cursor, replacing any selected text. */
 private fun TextFieldState.type(key: Char) = edit {
     val at = selection
@@ -244,6 +254,29 @@ private fun NoAccounts(anyAccounts: Boolean, onAddAccount: () -> Unit) {
         modifier = Modifier.fillMaxSize(),
         actionLabel = if (anyAccounts) null else "Add account",
         onAction = onAddAccount,
+    )
+}
+
+/** Room the SIM line takes in the dialer: its height and the gap above it. */
+private val SIM_LINE_SPACE = 48.dp
+
+/** Which Aster SIM the account calls out through; a quiet line, in the error colour when that SIM can't place calls. */
+@Composable
+private fun SimLineRow(line: SimLine, onClick: () -> Unit) {
+    Text(
+        line.text,
+        style = MaterialTheme.typography.bodySmall,
+        color = if (line.problem) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+        textAlign = TextAlign.Center,
+        maxLines = 2,
+        overflow = TextOverflow.Ellipsis,
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 40.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .clickable(onClickLabel = "Open in Aster", role = Role.Button, onClick = onClick)
+            .padding(horizontal = 8.dp, vertical = 12.dp)
+            .testTag("sim-line"),
     )
 }
 

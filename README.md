@@ -18,7 +18,12 @@ reached over a LAN or a VPN.
 - An Aster tab shows the Aster web panel inside the app. It asks for the panel's address once and offers the
   server of the first account. The tab only loads that address (plain HTTP is allowed for it) and opens other
   links in the browser; you sign in on the panel's own page and the app never stores the password. The page
-  is closed whenever the app is in the background
+  is closed whenever the app is in the background, and comes back with its back history. An address typed
+  without `http://` or `https://` is taken as `http://`
+- When the selected account is a phone of that Aster, the dialer shows one line under the account bar: the
+  modem its calls go out through, in red when the modem isn't ready, or that calls stay internal. Tapping it
+  opens that page in the Aster tab. The line comes from Aster's phones and modems lists, read with the panel's
+  login cookie while the dialer is on screen; without a login or on any error it isn't shown
 - A setup checklist for the Android and Samsung battery settings that would otherwise stop background calls
 
 Calls use G.711 (PCMA/PCMU) over UDP or TCP. TLS, video and messaging are out of scope.

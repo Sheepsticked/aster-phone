@@ -2,6 +2,7 @@ package app.asterphone.ui
 
 import android.Manifest
 import android.content.pm.PackageManager
+import android.webkit.CookieManager
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -35,13 +36,20 @@ import androidx.compose.ui.semantics.stateDescription
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.compose.currentStateAsState
 import app.asterphone.Notifications
 import app.asterphone.R
 import app.asterphone.data.AccountStore
+import app.asterphone.data.AddressCheck
 import app.asterphone.data.AsterAddress
+import app.asterphone.data.AsterOrigin
 import app.asterphone.data.AsterPanelSettings
+import app.asterphone.data.AsterStatusSource
 import app.asterphone.data.PhoneContacts
+import app.asterphone.data.SimLine
+import app.asterphone.data.SimQuery
 import app.asterphone.sip.RegistrationStatus
 import app.asterphone.sip.SipEngine
 import kotlinx.coroutines.launch
@@ -81,6 +89,15 @@ fun AppRoot(store: AccountStore, panel: AsterPanelSettings, requestedTab: Tab?, 
     }
     LifecycleEventEffect(Lifecycle.Event.ON_STOP) { asterHost.release() }
     DisposableEffect(asterHost) { onDispose { asterHost.release() } }
+
+    // The dialer's line about the SIM the selected account calls out through, looked up in Aster while the dialer is on screen.
+    val panelAddress = remember(asterAddress) { asterAddress?.let { AsterAddress.check(it) } as? AddressCheck.Valid }
+    val lifecycleState by LocalLifecycleOwner.current.lifecycle.currentStateAsState()
+    val callAccount = dialerAccount(accounts, dialAccount)?.account
+    val simQuery = remember(callAccount?.username, callAccount?.host, panelAddress?.origin) {
+        if (callAccount == null || panelAddress == null) null else SimQuery(callAccount.username, callAccount.host, panelAddress.origin)
+    }
+    val simLine = rememberSimLine(simQuery, watching = tab == Tab.Dial && editingId == null && lifecycleState.isAtLeast(Lifecycle.State.STARTED))
 
     LaunchedEffect(requestedTab) {
         if (requestedTab != null) {
@@ -160,6 +177,12 @@ fun AppRoot(store: AccountStore, panel: AsterPanelSettings, requestedTab: Tab?, 
                     onAllowContacts = if (contactsAllowed || contactsAsked) null else ({ contactsPermission.launch(Manifest.permission.READ_CONTACTS) }),
                     prefill = dialerNumber,
                     onPrefillConsumed = { dialerNumber = null },
+                    simLine = simLine,
+                    onOpenSimLine = { line ->
+                        panelAddress?.let { asterHost.open(it, line.path) }
+                        changingAsterAddress = false
+                        tab = Tab.Aster
+                    },
                 )
                 Tab.Recents -> RecentsScreen(
                     history = history,
@@ -206,6 +229,26 @@ fun AppRoot(store: AccountStore, panel: AsterPanelSettings, requestedTab: Tab?, 
             }
         }
     }
+}
+
+/**
+ * The line for [query], looked up whenever [query] or [watching] changes. Aster's answers are kept for a minute, so coming back to
+ * the dialer is usually free. Without an answer for this query there is no line.
+ */
+@Composable
+private fun rememberSimLine(query: SimQuery?, watching: Boolean): SimLine? {
+    var answer by remember { mutableStateOf<Pair<SimQuery, SimLine?>?>(null) }
+    LaunchedEffect(query, watching) {
+        if (query != null && watching) answer = query to AsterStatusSource.shared.lineFor(query) { panelCookie(query.panel) }
+    }
+    return answer?.takeIf { watching && it.first == query }?.second
+}
+
+/** The panel's cookie header from the web view's cookie store; null when there is none or no web view to ask. */
+private fun panelCookie(panel: AsterOrigin): String? = try {
+    CookieManager.getInstance().getCookie(panel.urlFor("/"))
+} catch (_: RuntimeException) {
+    null
 }
 
 @Composable
