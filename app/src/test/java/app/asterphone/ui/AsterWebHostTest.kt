@@ -308,4 +308,110 @@ class AsterWebHostTest {
         shadowOf(view).downloadListener.onDownloadStart("http://example.com/file.zip", "TestAgent", null, "application/zip", -1)
         assertEquals(0, shadowOf(application.getSystemService(DownloadManager::class.java)).requestCount)
     }
+
+    private fun browse(view: WebView, vararg paths: String) = paths.forEach { shadowOf(view).pushEntryToHistory("http://192.0.2.10:5099$it") }
+
+    @Test
+    fun releaseKeepsTheBackHistoryForTheNextView() {
+        val view = host.obtainView(address)
+        browse(view, "/calls", "/calls/12")
+        host.release()
+
+        val next = host.obtainView(address)
+        assertNotSame(view, next)
+        assertEquals("http://192.0.2.10:5099/calls/12", next.url)
+        assertTrue(next.canGoBack())
+        assertTrue(host.canGoBack)
+        host.goBack()
+        assertEquals("http://192.0.2.10:5099/calls", next.url)
+        assertFalse(next.canGoBack())
+    }
+
+    @Test
+    fun withNothingToRestoreItOpensTheCurrentPage() {
+        host.obtainView(address)
+        host.release()
+        val next = host.obtainView(address)
+        assertEquals("http://192.0.2.10:5099/", shadowOf(next).lastLoadedUrl)
+        assertFalse(next.canGoBack())
+    }
+
+    @Test
+    fun aHistoryOfAnotherAddressIsNotRestored() {
+        val view = host.obtainView(address)
+        browse(view, "/calls", "/calls/12")
+        host.release()
+
+        val moved = AsterAddress.check("http://192.0.2.20:5099/") as AddressCheck.Valid
+        val next = host.obtainView(moved)
+        assertEquals("http://192.0.2.20:5099/", shadowOf(next).lastLoadedUrl)
+        assertFalse(next.canGoBack())
+    }
+
+    @Test
+    fun resetForgetsTheKeptHistory() {
+        val view = host.obtainView(address)
+        browse(view, "/calls", "/calls/12")
+        host.release()
+        host.reset()
+
+        val next = host.obtainView(address)
+        assertEquals("http://192.0.2.10:5099/", shadowOf(next).lastLoadedUrl)
+        assertFalse(next.canGoBack())
+    }
+
+    @Test
+    fun aLostRendererKeepsNoBackHistory() {
+        val view = host.obtainView(address)
+        browse(view, "/calls", "/calls/12")
+        val detail = object : android.webkit.RenderProcessGoneDetail() {
+            override fun didCrash() = true
+            override fun rendererPriorityAtExit() = 0
+        }
+        client(view).onRenderProcessGone(view, detail)
+
+        val next = host.obtainView(address)
+        assertNull(shadowOf(next).lastLoadedUrl)
+        host.retry()
+        assertEquals("http://192.0.2.10:5099/calls/12", shadowOf(next).lastLoadedUrl)
+        assertFalse(next.canGoBack())
+    }
+
+    @Test
+    fun opensAPageOfThePanelInTheViewThatIsAlive() {
+        val view = host.obtainView(address)
+        host.detach(view)
+        host.open(address, "/modems/gsm1")
+        assertEquals("http://192.0.2.10:5099/modems/gsm1", shadowOf(view).lastLoadedUrl)
+        assertSame(view, host.obtainView(address))
+    }
+
+    @Test
+    fun opensAPageOfThePanelAsTheFirstPageOfTheNextView() {
+        host.open(address, "/phones")
+        assertEquals("http://192.0.2.10:5099/phones", shadowOf(host.obtainView(address)).lastLoadedUrl)
+    }
+
+    @Test
+    fun aPageOpenedAfterTheViewWasDroppedComesWithoutTheOldHistory() {
+        val view = host.obtainView(address)
+        browse(view, "/calls", "/calls/12")
+        host.release()
+        host.open(address, "/modems/gsm1")
+
+        val next = host.obtainView(address)
+        assertEquals("http://192.0.2.10:5099/modems/gsm1", shadowOf(next).lastLoadedUrl)
+        assertFalse(next.canGoBack())
+    }
+
+    @Test
+    fun aPageOpenedOnTheErrorScreenIsLoadedAgain() {
+        val view = host.obtainView(address)
+        client(view).onReceivedError(view, request("http://192.0.2.10:5099/"), failure())
+        assertEquals(PanelStatus.Failed, host.status)
+        host.open(address, "/phones")
+        client(view).onPageStarted(view, "http://192.0.2.10:5099/phones", null)
+        assertEquals(PanelStatus.Loading, host.status)
+        assertEquals("http://192.0.2.10:5099/phones", shadowOf(view).lastLoadedUrl)
+    }
 }

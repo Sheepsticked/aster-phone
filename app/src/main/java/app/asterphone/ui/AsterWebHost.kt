@@ -9,6 +9,7 @@ import android.graphics.Bitmap
 import android.graphics.Color
 import android.net.Uri
 import android.net.http.SslError
+import android.os.Bundle
 import android.os.Environment
 import android.util.Log
 import android.view.ViewGroup
@@ -34,8 +35,8 @@ enum class PanelStatus { Loading, Ready, Failed }
 
 /**
  * Owns the web view behind the Aster tab. The page keeps a live connection to the server for as long as the view
- * exists, so the view is dropped whenever the app leaves the foreground and made again, on the same page, when the
- * tab is next shown.
+ * exists, so the view is dropped whenever the app leaves the foreground and made again, on the same page and with the
+ * same back history, when the tab is next shown.
  */
 class AsterWebHost(private val context: Context, resumeUrl: String?) {
     var status by mutableStateOf(PanelStatus.Loading)
@@ -53,7 +54,11 @@ class AsterWebHost(private val context: Context, resumeUrl: String?) {
     var resumeUrl: String? = resumeUrl
         private set
 
+    /** What a dropped view had behind it: its saved state, and the page it was on. Kept in memory only. */
+    private class SavedHistory(val state: Bundle, val currentUrl: String)
+
     private var webView: WebView? = null
+    private var history: SavedHistory? = null
     private var address: AddressCheck.Valid? = null
     private var failedUrl: String? = null
     private var loadFailed = false
@@ -74,6 +79,8 @@ class AsterWebHost(private val context: Context, resumeUrl: String?) {
         canGoBack = false
         loadFailed = false
         val first = resumeUrl?.takeIf { address.origin.allows(it) } ?: address.url
+        val saved = history
+        history = null
         val view = newView(address)
         webView = view
         if (rendererLost) {
@@ -81,6 +88,8 @@ class AsterWebHost(private val context: Context, resumeUrl: String?) {
             rendererLost = false
             failedUrl = first
             status = PanelStatus.Failed
+        } else if (saved != null && address.origin.allows(saved.currentUrl) && view.restoreState(saved.state) != null) {
+            canGoBack = view.canGoBack()
         } else {
             view.loadUrl(first)
         }
@@ -105,17 +114,40 @@ class AsterWebHost(private val context: Context, resumeUrl: String?) {
         view.loadUrl(target)
     }
 
-    /** Drops the view and the page it was on: the next view opens the saved address from the start. */
+    /** Shows [path] of the panel at [address]: in the view if one is alive, else as the first page of the next view. */
+    fun open(address: AddressCheck.Valid, path: String) {
+        val url = address.origin.urlFor(path)
+        resumeUrl = url
+        failedUrl = null
+        // A view that was dropped comes back on this page alone: its old history isn't put under it.
+        history = null
+        webView?.loadUrl(url)
+    }
+
+    /** Drops the view, its page and its history: the next view opens the saved address from the start. */
     fun reset() {
         resumeUrl = null
         failedUrl = null
+        history = null
         destroyView()
     }
 
-    /** Remembers the current page and destroys the view, which closes the page's connections. */
-    fun release() {
-        webView?.url?.takeIf { address?.origin?.allows(it) == true }?.let { resumeUrl = it }
+    /** Remembers the current page and what is behind it, and destroys the view, which closes the page's connections. */
+    fun release() = release(keepHistory = true)
+
+    private fun release(keepHistory: Boolean) {
+        val view = webView ?: return
+        view.url?.takeIf { address?.origin?.allows(it) == true }?.let { url ->
+            resumeUrl = url
+            if (keepHistory) history = saveHistory(view)
+        }
         destroyView()
+    }
+
+    private fun saveHistory(view: WebView): SavedHistory? {
+        val state = Bundle()
+        val current = view.saveState(state)?.currentItem?.url ?: return null
+        return SavedHistory(state, current).takeIf { address?.origin?.allows(current) == true }
     }
 
     private fun destroyView() {
@@ -245,7 +277,8 @@ class AsterWebHost(private val context: Context, resumeUrl: String?) {
             // Without this the whole app would go down with the page.
             Log.w(TAG, "Web renderer gone, crashed=${detail.didCrash()}")
             rendererLost = attached
-            release()
+            // The page that was on may be what brought the renderer down, so nothing of it is reopened by itself.
+            release(keepHistory = false)
             return true
         }
     }
