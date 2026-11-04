@@ -143,7 +143,7 @@ class AsterApiTest {
 
         val line = runBlocking { source.lineFor(query) { "theme=dark; aster_sid=abc" } }
         assertNotNull(line)
-        assertEquals("Calls go out through gsm1 · Operator · +1234567890", line!!.text)
+        assertEquals("Calls go out through gsm1 ·\u00A0Operator ·\u00A0+1234567890", line!!.text)
         assertEquals(2, requests.size)
 
         // The next look is answered from memory.

@@ -373,7 +373,7 @@ class DialerScreenTest {
     @Test
     fun showsWhichSimTheCallsGoOutThrough() {
         show(simLine = readySim)
-        compose.onNodeWithTag("sim-line").assert(hasText("Calls go out through gsm1 · Example Mobile · +1234567890"))
+        compose.onNodeWithTag("sim-line").assert(hasText("Calls go out through gsm1 ·\u00A0Example Mobile ·\u00A0+1234567890"))
     }
 
     @Test

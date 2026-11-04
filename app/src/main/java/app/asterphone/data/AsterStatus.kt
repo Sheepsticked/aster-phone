@@ -38,7 +38,8 @@ sealed interface SimLine {
         override val problem get() = modem.state != READY
         override val text
             get() = if (!problem) {
-                "Calls go out through " + listOfNotNull(modem.id, modem.provider, modem.phoneNumber).joinToString(" · ")
+                // A wrapped line breaks before a separator, never after it.
+                "Calls go out through " + listOfNotNull(modem.id, modem.provider, modem.phoneNumber).joinToString(" ·\u00A0")
             } else {
                 "${modem.id} is not ready (${modem.state.replace('-', ' ')})"
             }

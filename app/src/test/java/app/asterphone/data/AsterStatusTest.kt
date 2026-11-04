@@ -105,7 +105,7 @@ class AsterStatusTest {
     fun findsTheModemOfAPhone() {
         val line = snapshot.lineFor(query("504")) as SimLine.Through
         assertEquals(gsm1, line.modem)
-        assertEquals("Calls go out through gsm1 · Example Mobile · +1234567890", line.text)
+        assertEquals("Calls go out through gsm1 ·\u00A0Example Mobile ·\u00A0+1234567890", line.text)
         assertFalse(line.problem)
         assertEquals("/modems/gsm1", line.path)
     }
@@ -113,9 +113,9 @@ class AsterStatusTest {
     @Test
     fun leavesOutWhatTheModemDoesntKnow() {
         val bare = AsterSnapshot(phones, listOf(gsm1.copy(provider = null), gsm2))
-        assertEquals("Calls go out through gsm1 · +1234567890", bare.lineFor(query("504"))!!.text)
+        assertEquals("Calls go out through gsm1 ·\u00A0+1234567890", bare.lineFor(query("504"))!!.text)
         val withoutNumber = AsterSnapshot(phones, listOf(gsm1.copy(phoneNumber = null), gsm2))
-        assertEquals("Calls go out through gsm1 · Example Mobile", withoutNumber.lineFor(query("504"))!!.text)
+        assertEquals("Calls go out through gsm1 ·\u00A0Example Mobile", withoutNumber.lineFor(query("504"))!!.text)
         val neither = AsterSnapshot(phones, listOf(gsm1.copy(provider = null, phoneNumber = null), gsm2))
         assertEquals("Calls go out through gsm1", neither.lineFor(query("504"))!!.text)
     }
@@ -242,7 +242,7 @@ class AsterStatusTest {
     fun anotherAccountOfTheSamePanelUsesTheSameAnswer() {
         val test = Source(answer = snapshot)
         test.line(query("501"))
-        assertEquals("Calls go out through gsm1 · Example Mobile · +1234567890", test.line(query("504"))!!.text)
+        assertEquals("Calls go out through gsm1 ·\u00A0Example Mobile ·\u00A0+1234567890", test.line(query("504"))!!.text)
         assertEquals(1, test.fetched.size)
     }
 
