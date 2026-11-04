@@ -15,6 +15,10 @@ reached over a LAN or a VPN.
   next to Call opens the phone's contact picker. Contacts are read on the phone only and never sent anywhere
 - Call history: tapping an entry puts its number in the dialer, with the account it used when that is still on;
   the phone icon calls back at once through the same account
+- An Aster tab shows the Aster web panel inside the app. It asks for the panel's address once and offers the
+  server of the first account. The tab only loads that address (plain HTTP is allowed for it) and opens other
+  links in the browser; you sign in on the panel's own page and the app never stores the password. The page
+  is closed whenever the app is in the background
 - A setup checklist for the Android and Samsung battery settings that would otherwise stop background calls
 
 Calls use G.711 (PCMA/PCMU) over UDP or TCP. TLS, video and messaging are out of scope.
