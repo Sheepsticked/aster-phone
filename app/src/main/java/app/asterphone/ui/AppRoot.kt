@@ -52,6 +52,7 @@ import app.asterphone.data.SimLine
 import app.asterphone.data.SimQuery
 import app.asterphone.sip.RegistrationStatus
 import app.asterphone.sip.SipEngine
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /** Bottom bar tabs, with a filled icon for the selected tab and an outlined one otherwise. */
@@ -232,14 +233,18 @@ fun AppRoot(store: AccountStore, panel: AsterPanelSettings, requestedTab: Tab?, 
 }
 
 /**
- * The line for [query], looked up whenever [query] or [watching] changes. Aster's answers are kept for a minute, so coming back to
- * the dialer is usually free. Without an answer for this query there is no line.
+ * The line for [query], looked up when [query] or [watching] changes and again every minute while [watching]. Aster's answers are
+ * kept for a minute, so coming back to the dialer is usually free. Without an answer for this query there is no line.
  */
 @Composable
 private fun rememberSimLine(query: SimQuery?, watching: Boolean): SimLine? {
     var answer by remember { mutableStateOf<Pair<SimQuery, SimLine?>?>(null) }
     LaunchedEffect(query, watching) {
-        if (query != null && watching) answer = query to AsterStatusSource.shared.lineFor(query) { panelCookie(query.panel) }
+        if (query == null || !watching) return@LaunchedEffect
+        while (true) {
+            answer = query to AsterStatusSource.shared.lineFor(query) { panelCookie(query.panel) }
+            delay(AsterStatusSource.MAX_AGE_MILLIS)
+        }
     }
     return answer?.takeIf { watching && it.first == query }?.second
 }
