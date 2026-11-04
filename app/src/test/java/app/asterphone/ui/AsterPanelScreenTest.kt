@@ -50,11 +50,19 @@ class AsterPanelScreenTest {
     }
 
     @Test
+    fun opensAnAddressTypedWithoutAScheme() {
+        showAddress("")
+        type("192.0.2.10:8080")
+        compose.onNodeWithText("Open").performClick()
+        assertEquals("http://192.0.2.10:8080/", opened)
+    }
+
+    @Test
     fun explainsAnInvalidAddressAndClearsTheMessageOnEdit() {
         showAddress("")
         compose.onNodeWithText("Open").performClick()
         compose.onNodeWithText("Enter the address of Aster").assertExists()
-        type("192.0.2.10")
+        type("ftp://192.0.2.10/")
         compose.onNodeWithText("Enter the address of Aster").assertDoesNotExist()
         compose.onNodeWithText("Open").performClick()
         compose.onNodeWithText("Start with http:// or https://").assertExists()

@@ -62,10 +62,67 @@ class AsterPanelTest {
     }
 
     @Test
-    fun rejectsAddressesWithoutHttpOrHttps() {
-        for (text in listOf("192.0.2.10", "192.0.2.10:5099", "aster", "ftp://192.0.2.10/", "file:///sdcard/x.html", "javascript:alert(1)", "//192.0.2.10/")) {
+    fun rejectsAddressesWithAnotherScheme() {
+        for (text in listOf("ftp://192.0.2.10/", "file:///sdcard/x.html", "javascript:alert(1)", "//192.0.2.10/", "mailto:admin@example.com", "ftp:/192.0.2.10", "http:192.0.2.10")) {
             assertEquals(text, "Start with http:// or https://", problem(text))
         }
+    }
+
+    @Test
+    fun takesAnAddressWithoutASchemeAsHttp() {
+        val cases = mapOf(
+            "192.0.2.10" to "http://192.0.2.10/",
+            "192.0.2.10:8080" to "http://192.0.2.10:8080/",
+            "  192.0.2.10:8080/panel " to "http://192.0.2.10:8080/panel",
+            "aster" to "http://aster/",
+            "Aster.Example.com:5099" to "http://Aster.Example.com:5099/",
+            "localhost:5099/calls?page=2" to "http://localhost:5099/calls?page=2",
+            "[2001:db8::10]:8080" to "http://[2001:db8::10]:8080/",
+            "[::1]" to "http://[::1]/",
+        )
+        for ((text, url) in cases) {
+            val result = AsterAddress.check(text)
+            assertTrue(text, result is AddressCheck.Valid)
+            assertEquals(text, url, (result as AddressCheck.Valid).url)
+        }
+        assertEquals(AsterOrigin("http", "192.0.2.10", 8080), origin("192.0.2.10:8080"))
+        assertEquals(AsterOrigin("http", "aster.example.com", 80), origin("Aster.Example.com"))
+        assertEquals(AsterOrigin("http", "[2001:db8::10]", 8080), origin("[2001:db8::10]:8080"))
+    }
+
+    @Test
+    fun keepsHttpsAsTyped() {
+        assertEquals("https://192.0.2.10/", (AsterAddress.check("https://192.0.2.10") as AddressCheck.Valid).url)
+        assertEquals(AsterOrigin("https", "aster.example.com", 8443), origin("https://aster.example.com:8443/"))
+    }
+
+    @Test
+    fun stillRejectsBadAddressesWithoutAScheme() {
+        assertEquals("Port must be between 1 and 65535", problem("192.0.2.10:99999"))
+        assertEquals("Port must be between 1 and 65535", problem("aster:99999"))
+        assertEquals("Leave the user name and password out", problem("admin@192.0.2.10"))
+        assertEquals("That isn't a valid host name or IP address", problem("aster panel"))
+        assertEquals("Enter the address of Aster", problem("  "))
+    }
+
+    @Test
+    fun anAddressThatCameFromAPageNeedsItsScheme() {
+        for (text in listOf("192.0.2.10", "192.0.2.10:5099/x", "aster/calls", "[::1]:80")) {
+            assertEquals(text, "Start with http:// or https://", (AsterAddress.checkUrl(text) as AddressCheck.Invalid).reason)
+        }
+        assertFalse(origin("http://192.0.2.10:5099/").allows("192.0.2.10:5099/calls"))
+        assertTrue(AsterAddress.checkUrl("http://192.0.2.10:5099/calls") is AddressCheck.Valid)
+    }
+
+    @Test
+    fun buildsPagesOnTheOrigin() {
+        assertEquals("http://192.0.2.10/phones", origin("http://192.0.2.10/").urlFor("/phones"))
+        assertEquals("http://192.0.2.10:5099/modems/gsm1", origin("http://192.0.2.10:5099/").urlFor("/modems/gsm1"))
+        assertEquals("https://aster.example.com/phones", origin("https://aster.example.com:443/panel").urlFor("/phones"))
+        assertEquals("https://aster.example.com:8443/phones", origin("https://aster.example.com:8443/").urlFor("/phones"))
+        assertEquals("http://[2001:db8::10]:8080/phones", origin("http://[2001:db8::10]:8080/").urlFor("/phones"))
+        val aster = origin("http://192.0.2.10:5099/")
+        assertTrue(aster.allows(aster.urlFor("/modems/gsm1")))
     }
 
     @Test

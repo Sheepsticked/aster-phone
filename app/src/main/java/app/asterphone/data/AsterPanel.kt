@@ -6,7 +6,13 @@ import java.net.URLDecoder
 /** The scheme, host and port the Aster tab may load. */
 data class AsterOrigin(val scheme: String, val host: String, val port: Int) {
     /** True when [url] is on this origin. Anything unusual (user info, backslashes, another scheme) is not. */
-    fun allows(url: String): Boolean = (AsterAddress.check(url) as? AddressCheck.Valid)?.origin == this
+    fun allows(url: String): Boolean = (AsterAddress.checkUrl(url) as? AddressCheck.Valid)?.origin == this
+
+    /** The address of [path], which starts with "/", on this origin. */
+    fun urlFor(path: String): String {
+        val defaultPort = if (scheme == "https") 443 else 80
+        return "$scheme://$host${if (port == defaultPort) "" else ":$port"}$path"
+    }
 }
 
 sealed interface AddressCheck {
@@ -20,8 +26,14 @@ object AsterAddress {
     fun defaultFor(accounts: List<SipAccount>): String =
         accounts.firstOrNull { it.enabled }?.let { "http://${it.uriHost()}/" }.orEmpty()
 
-    /** Parses an http or https address into the URL to open and its origin, or says what is wrong with it. */
+    /** Parses what was typed into the URL to open and its origin, or says what is wrong with it. Without a scheme it is http. */
     fun check(text: String): AddressCheck {
+        val raw = text.trim()
+        return checkUrl(if (raw.isEmpty() || "://" in raw || OTHER_SCHEME.containsMatchIn(raw)) raw else "http://$raw")
+    }
+
+    /** Like [check], but the scheme must be there: for web addresses that came from the page rather than from the user. */
+    fun checkUrl(text: String): AddressCheck {
         val raw = text.trim()
         if (raw.isEmpty()) return AddressCheck.Invalid("Enter the address of Aster")
         val schemeEnd = raw.indexOf("://")
@@ -62,6 +74,9 @@ object AsterAddress {
     }
 
     private const val NOT_A_HOST = "That isn't a valid host name or IP address"
+
+    // Text that starts like another scheme ("javascript:alert(1)", "ftp:/x") or like a scheme-relative link, but not "host:port".
+    private val OTHER_SCHEME = Regex("""^(?:[A-Za-z][A-Za-z0-9+.-]*:(?!\d+(?:[/?#]|$))|//)""")
     private val NAME = Regex("[A-Za-z0-9._-]+")
     private val IPV6 = Regex("\\[[0-9A-Fa-f:.]+]")
 }
