@@ -29,6 +29,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -133,7 +134,10 @@ fun rememberHaptics(): Haptics {
     return remember(view) { Haptics(view) }
 }
 
-/** What a list or screen shows when it has nothing yet: an icon, a title, a line of text and an optional button. */
+/**
+ * What a list or screen shows when it has nothing yet: an icon, a title, a line of text and optional buttons,
+ * the second one quieter than the first.
+ */
 @Composable
 fun EmptyState(
     @DrawableRes icon: Int,
@@ -142,6 +146,9 @@ fun EmptyState(
     modifier: Modifier = Modifier,
     actionLabel: String? = null,
     onAction: () -> Unit = {},
+    actionEnabled: Boolean = true,
+    secondaryLabel: String? = null,
+    onSecondary: () -> Unit = {},
 ) {
     Column(
         modifier.padding(32.dp),
@@ -155,7 +162,11 @@ fun EmptyState(
         Text(text, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
         if (actionLabel != null) {
             Spacer(Modifier.height(16.dp))
-            Button(onClick = onAction) { Text(actionLabel) }
+            Button(onClick = onAction, enabled = actionEnabled) { Text(actionLabel) }
+        }
+        if (secondaryLabel != null) {
+            Spacer(Modifier.height(if (actionLabel != null) 4.dp else 16.dp))
+            TextButton(onClick = onSecondary) { Text(secondaryLabel) }
         }
     }
 }

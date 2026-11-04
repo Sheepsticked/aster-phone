@@ -246,6 +246,8 @@ fun SetupScreen(
     accounts: List<AccountState>,
     detailedLog: Boolean,
     onDetailedLog: (Boolean) -> Unit,
+    asterAddress: String?,
+    onEditAsterAddress: () -> Unit,
 ) {
     val todo = checks.count { it.needsAction }
     LazyColumn(contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -276,6 +278,22 @@ fun SetupScreen(
                         }
                     }
                     OutlinedButton(onClick = { SipEngine.refreshRegistrations() }) { Text("Register again now") }
+                }
+            }
+        }
+        item {
+            Card(onClick = onEditAsterAddress, modifier = Modifier.fillMaxWidth()) {
+                Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text("Aster panel", style = MaterialTheme.typography.titleMedium)
+                        Text(
+                            asterAddress ?: "No address yet",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Spacer(Modifier.width(12.dp))
+                    Text(if (asterAddress == null) "Set" else "Change", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
                 }
             }
         }

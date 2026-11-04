@@ -22,11 +22,12 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         requestedTab = tabFrom(intent)
-        val store = (application as AsterPhoneApp).accountStore
+        val app = application as AsterPhoneApp
         setContent {
             AsterPhoneTheme {
                 AppRoot(
-                    store = store,
+                    store = app.accountStore,
+                    panel = app.asterPanel,
                     requestedTab = requestedTab,
                     onTabHandled = { requestedTab = null },
                     onOpenCall = ::openCall,

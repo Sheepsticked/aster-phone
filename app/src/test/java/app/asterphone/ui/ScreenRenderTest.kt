@@ -110,7 +110,40 @@ class ScreenRenderTest {
         SystemBars { AccountEditScreen(null, emptyList(), {}, {}, {}) }
     }
 
-    @Test fun setup() = render("setup") { App(Tab.Setup, setupNeedsAction = true) { SetupScreen(Samples.checks, Samples.accounts, detailedLog = false, onDetailedLog = {}) } }
+    @Test fun setup() = render("setup") { App(Tab.Setup, setupNeedsAction = true) { SetupScreen(Samples.checks, Samples.accounts, detailedLog = false, onDetailedLog = {}, asterAddress = "http://192.0.2.10/", onEditAsterAddress = {}) } }
+
+    @Test
+    @Config(qualifiers = "w384dp-h832dp-xxhdpi")
+    fun asterAddress() = render("aster-address") { App(Tab.Aster) { AsterAddressScreen("http://192.0.2.10/", {}, null) } }
+
+    @Test
+    @Config(qualifiers = "w384dp-h832dp-xxhdpi")
+    fun asterAddressDark() = render("aster-address-dark", dark = true) { App(Tab.Aster) { AsterAddressScreen("http://192.0.2.10/", {}, null) } }
+
+    @Test
+    @Config(qualifiers = "w384dp-h832dp-xxhdpi")
+    fun asterAddressError() = render("aster-address-error", before = { compose.onNodeWithText("Open").performClick() }) {
+        App(Tab.Aster) { AsterAddressScreen("", {}, {}) }
+    }
+
+    @Test
+    @Config(qualifiers = "w384dp-h832dp-xxhdpi")
+    fun asterUnreachable() = render("aster-unreachable") { App(Tab.Aster) { Unreachable() } }
+
+    @Test
+    @Config(qualifiers = "w384dp-h832dp-xxhdpi")
+    fun asterUnreachableDark() = render("aster-unreachable-dark", dark = true) { App(Tab.Aster) { Unreachable() } }
+
+    @Test
+    @Config(qualifiers = "w384dp-h832dp-xxhdpi")
+    fun asterUnreachableLargeFont() = render("aster-unreachable-large-font", fontScale = 1.3f) {
+        App(Tab.Aster) { AsterUnreachableScreen("https://aster.example.com:8443/panel/", retrying = true, onRetry = {}, onChangeAddress = {}) }
+    }
+
+    @Test
+    fun setupAsterRow() = render("setup-aster") {
+        App(Tab.Setup) { SetupScreen(Samples.checks.take(1), Samples.accounts.take(1), detailedLog = false, onDetailedLog = {}, asterAddress = null, onEditAsterAddress = {}) }
+    }
 
     @Test fun incomingCall() = render("call-incoming") { SystemBars { Call(Samples.incoming) } }
 
@@ -140,6 +173,9 @@ class ScreenRenderTest {
 
     @Composable
     private fun Accounts(accounts: List<AccountState>) = AccountsScreen(accounts, {}, {}, { _, _ -> }, {})
+
+    @Composable
+    private fun Unreachable() = AsterUnreachableScreen("http://192.0.2.10:5099/", retrying = false, onRetry = {}, onChangeAddress = {})
 
     @Composable
     private fun Call(call: CallInfo) = CallScreen(call, {}, {}, {}, {}, {}, {}, {}, {}, {})

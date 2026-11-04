@@ -2,6 +2,7 @@ package app.asterphone
 
 import android.app.Application
 import app.asterphone.data.AccountStore
+import app.asterphone.data.AsterPanelSettings
 import app.asterphone.data.PhoneContacts
 import app.asterphone.sip.SipEngine
 import kotlinx.coroutines.MainScope
@@ -10,6 +11,7 @@ import kotlinx.coroutines.launch
 
 class AsterPhoneApp : Application() {
     val accountStore: AccountStore by lazy { AccountStore(this) }
+    val asterPanel: AsterPanelSettings by lazy { AsterPanelSettings(this) }
     private val scope = MainScope()
 
     override fun onCreate() {

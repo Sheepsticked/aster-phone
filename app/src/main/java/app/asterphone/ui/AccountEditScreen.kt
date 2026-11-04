@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -220,7 +221,7 @@ fun AccountEditScreen(
 
 /** A single-line text field that shows [error] under it, or else [help]. */
 @Composable
-private fun FormField(
+fun FormField(
     value: String,
     onValueChange: (String) -> Unit,
     label: String,
@@ -230,6 +231,7 @@ private fun FormField(
     error: String? = null,
     visualTransformation: VisualTransformation = VisualTransformation.None,
     keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
+    keyboardActions: KeyboardActions = KeyboardActions.Default,
     trailingIcon: (@Composable () -> Unit)? = null,
 ) {
     OutlinedTextField(
@@ -242,6 +244,7 @@ private fun FormField(
         singleLine = true,
         visualTransformation = visualTransformation,
         keyboardOptions = keyboardOptions,
+        keyboardActions = keyboardActions,
         trailingIcon = trailingIcon,
         modifier = modifier,
     )

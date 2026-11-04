@@ -46,7 +46,8 @@ data class SipAccount(
 
     fun validate(): List<String> = fieldErrors().values.toList()
 
-    private fun uriHost(): String = if (':' in host && !host.startsWith("[")) "[$host]" else host
+    /** The host as it appears in a URI: IPv6 addresses get brackets. */
+    fun uriHost(): String = if (':' in host && !host.startsWith("[")) "[$host]" else host
 
     companion object {
         const val DEFAULT_PORT = 5060

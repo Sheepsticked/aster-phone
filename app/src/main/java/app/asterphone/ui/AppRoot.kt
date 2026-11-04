@@ -7,6 +7,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.DrawableRes
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Badge
@@ -17,11 +18,13 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -30,10 +33,14 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.asterphone.Notifications
 import app.asterphone.R
 import app.asterphone.data.AccountStore
+import app.asterphone.data.AsterAddress
+import app.asterphone.data.AsterPanelSettings
 import app.asterphone.data.PhoneContacts
 import app.asterphone.sip.RegistrationStatus
 import app.asterphone.sip.SipEngine
@@ -45,12 +52,14 @@ enum class Tab(val label: String, @param:DrawableRes val selectedIcon: Int, @par
     Recents("Recents", R.drawable.ic_history, R.drawable.ic_history_outlined),
     Accounts("Accounts", R.drawable.ic_manage_accounts, R.drawable.ic_manage_accounts_outlined),
     Setup("Setup", R.drawable.ic_fact_check, R.drawable.ic_fact_check_outlined),
+    // The Aster mark is a single shape, so the selected tab doesn't get a filled variant.
+    Aster("Aster", R.drawable.ic_stat_app, R.drawable.ic_stat_app),
 }
 
 private const val NEW_ACCOUNT = ""
 
 @Composable
-fun AppRoot(store: AccountStore, requestedTab: Tab?, onTabHandled: () -> Unit, onOpenCall: () -> Unit) {
+fun AppRoot(store: AccountStore, panel: AsterPanelSettings, requestedTab: Tab?, onTabHandled: () -> Unit, onOpenCall: () -> Unit) {
     val accounts by SipEngine.accounts.collectAsStateWithLifecycle()
     val history by SipEngine.history.collectAsStateWithLifecycle()
     val call by SipEngine.call.collectAsStateWithLifecycle()
@@ -64,6 +73,14 @@ fun AppRoot(store: AccountStore, requestedTab: Tab?, onTabHandled: () -> Unit, o
     var dialerNumber by rememberSaveable { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
+    var asterAddress by remember { mutableStateOf(panel.address) }
+    var changingAsterAddress by rememberSaveable { mutableStateOf(false) }
+    // The web view lives as long as the screen does, but only while the app is in the foreground.
+    val asterHost = rememberSaveable(saver = Saver(save = { it.resumeUrl }, restore = { AsterWebHost(context, it) })) {
+        AsterWebHost(context, null)
+    }
+    LifecycleEventEffect(Lifecycle.Event.ON_STOP) { asterHost.release() }
+    DisposableEffect(asterHost) { onDispose { asterHost.release() } }
 
     LaunchedEffect(requestedTab) {
         if (requestedTab != null) {
@@ -125,7 +142,8 @@ fun AppRoot(store: AccountStore, requestedTab: Tab?, onTabHandled: () -> Unit, o
             )
         },
     ) { padding ->
-        Box(Modifier.fillMaxSize().padding(padding)) {
+        // The Aster tab's page resizes for the keyboard, so the bar and system insets count as already padded.
+        Box(Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding)) {
             when (tab) {
                 Tab.Dial -> DialerScreen(
                     accounts = accounts,
@@ -165,6 +183,25 @@ fun AppRoot(store: AccountStore, requestedTab: Tab?, onTabHandled: () -> Unit, o
                     accounts = accounts,
                     detailedLog = detailedLog,
                     onDetailedLog = SipEngine::setDetailedLog,
+                    asterAddress = asterAddress,
+                    onEditAsterAddress = {
+                        changingAsterAddress = true
+                        tab = Tab.Aster
+                    },
+                )
+                Tab.Aster -> AsterPanelTab(
+                    host = asterHost,
+                    savedAddress = asterAddress,
+                    suggestedAddress = AsterAddress.defaultFor(accounts.map { it.account }),
+                    changingAddress = changingAsterAddress,
+                    onSaveAddress = { url ->
+                        panel.address = url
+                        asterAddress = url
+                        changingAsterAddress = false
+                        asterHost.reset()
+                    },
+                    onChangeAddress = { changingAsterAddress = true },
+                    onCancelChange = { changingAsterAddress = false },
                 )
             }
         }

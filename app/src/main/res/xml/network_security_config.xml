@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The Aster tab loads a web panel that is usually served over plain HTTP on a private network. Its address is
+     chosen in the app, so no host can be listed here; the tab itself only ever loads the saved address. -->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true" />
+</network-security-config>
