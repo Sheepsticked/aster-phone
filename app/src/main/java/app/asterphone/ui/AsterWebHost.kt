@@ -28,6 +28,7 @@ import androidx.compose.runtime.setValue
 import androidx.core.net.toUri
 import app.asterphone.data.AddressCheck
 import app.asterphone.data.AsterDownloads
+import java.io.ByteArrayInputStream
 
 enum class PanelStatus { Loading, Ready, Failed }
 
@@ -155,7 +156,7 @@ class AsterWebHost(private val context: Context, resumeUrl: String?) {
 
     private fun fail(url: String) {
         loadFailed = true
-        failedUrl = url
+        if (address?.origin?.allows(url) == true) failedUrl = url
         retrying = false
         status = PanelStatus.Failed
     }
@@ -196,6 +197,15 @@ class AsterWebHost(private val context: Context, resumeUrl: String?) {
             return true
         }
 
+        // Reached for every request, including form posts and subresources that shouldOverrideUrlLoading never sees.
+        override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): WebResourceResponse? {
+            val scheme = request.url.scheme
+            if ((scheme != "http" && scheme != "https") || address.origin.allows(request.url.toString())) return null
+            // A navigation that was dropped leaves the page as it is.
+            val status = if (request.isForMainFrame) 204 else 403
+            return WebResourceResponse("text/plain", "utf-8", status, "Blocked", emptyMap(), ByteArrayInputStream(ByteArray(0)))
+        }
+
         override fun onPageStarted(view: WebView, url: String?, favicon: Bitmap?) {
             loadFailed = false
             if (status == PanelStatus.Failed && !retrying) status = PanelStatus.Loading
@@ -227,7 +237,8 @@ class AsterWebHost(private val context: Context, resumeUrl: String?) {
             // A certificate the system doesn't trust is never accepted.
             handler.cancel()
             Log.w(TAG, "Certificate refused: primary error ${error.primaryError}")
-            fail(error.url)
+            // The panel's own certificate failing means the page can't load; another host's is just not loaded.
+            if (address.origin.allows(error.url)) fail(view.url?.takeIf { address.origin.allows(it) } ?: address.url)
         }
 
         override fun onRenderProcessGone(view: WebView, detail: RenderProcessGoneDetail): Boolean {

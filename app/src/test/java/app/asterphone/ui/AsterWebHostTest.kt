@@ -132,13 +132,53 @@ class AsterWebHostTest {
 
     @Test
     fun aRefusedCertificateShowsTheErrorScreen() {
-        val view = host.obtainView(address)
+        val secure = AsterAddress.check("https://192.0.2.10:8443/") as AddressCheck.Valid
+        val view = host.obtainView(secure)
         val handler = TestSslErrorHandler()
-        val error = SslError(SslError.SSL_UNTRUSTED, SslCertificate("CN=aster", "CN=aster", java.util.Date(0), java.util.Date(1)), "https://192.0.2.10:5099/")
+        val error = SslError(SslError.SSL_UNTRUSTED, SslCertificate("CN=aster", "CN=aster", java.util.Date(0), java.util.Date(1)), "https://192.0.2.10:8443/")
         client(view).onReceivedSslError(view, handler, error)
         assertTrue(handler.cancelled)
         assertFalse(handler.proceeded)
         assertEquals(PanelStatus.Failed, host.status)
+    }
+
+    @Test
+    fun aRefusedCertificateOfAnotherHostIsIgnored() {
+        val view = host.obtainView(address)
+        val handler = TestSslErrorHandler()
+        client(view).onReceivedSslError(view, handler, SslError(SslError.SSL_UNTRUSTED, SslCertificate("CN=other", "CN=other", java.util.Date(0), java.util.Date(1)), "https://example.com/x.js"))
+        assertTrue(handler.cancelled)
+        assertEquals(PanelStatus.Loading, host.status)
+    }
+
+    @Test
+    fun retryAfterACertificateErrorReopensThePageNotTheResource() {
+        val view = host.obtainView(address)
+        shadowOf(view).pushEntryToHistory("http://192.0.2.10:5099/calls")
+        val error = SslError(SslError.SSL_UNTRUSTED, SslCertificate("CN=aster", "CN=aster", java.util.Date(0), java.util.Date(1)), "http://192.0.2.10:5099/assets/app.js")
+        client(view).onReceivedSslError(view, TestSslErrorHandler(), error)
+        assertEquals(PanelStatus.Failed, host.status)
+        host.retry()
+        assertEquals("http://192.0.2.10:5099/calls", shadowOf(view).lastLoadedUrl)
+    }
+
+    @Test
+    fun dropsRequestsToOtherOriginsEvenWhenTheyAreNotLinkClicks() {
+        val view = host.obtainView(address)
+        val page = client(view).shouldInterceptRequest(view, request("http://example.com/steal", mainFrame = true))
+        assertEquals(204, page!!.statusCode)
+        val script = client(view).shouldInterceptRequest(view, request("https://example.com/x.js", mainFrame = false))
+        assertEquals(403, script!!.statusCode)
+        val otherPort = client(view).shouldInterceptRequest(view, request("http://192.0.2.10:5100/x", mainFrame = false))
+        assertEquals(403, otherPort!!.statusCode)
+    }
+
+    @Test
+    fun letsTheSavedOriginAndInPageUrlsThrough() {
+        val view = host.obtainView(address)
+        assertNull(client(view).shouldInterceptRequest(view, request("http://192.0.2.10:5099/api/me", mainFrame = false)))
+        assertNull(client(view).shouldInterceptRequest(view, request("blob:http://192.0.2.10:5099/1234", mainFrame = false)))
+        assertNull(client(view).shouldInterceptRequest(view, request("data:image/png;base64,AAAA", mainFrame = false)))
     }
 
     @Test
