@@ -3,6 +3,7 @@ package app.asterphone.data
 import android.app.Application
 import com.sun.net.httpserver.HttpExchange
 import com.sun.net.httpserver.HttpServer
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
@@ -189,6 +190,23 @@ class AsterProbeTest {
         probes.refresh(listOf("http://192.0.2.10/"))
         probes.refresh(listOf("http://192.0.2.10/"), force = true)
         assertEquals(2, asked.size)
+    }
+
+    @Test
+    fun aSlowLookThatEndsAfterANewerOneIsNotRecorded() {
+        val answers = ArrayDeque<CompletableDeferred<AsterReach>>()
+        val found = mutableListOf<Pair<String, AsterReach>>()
+        val probes = AsterProbes(
+            scope = CoroutineScope(Dispatchers.Unconfined),
+            record = { address, result -> found += address to result },
+            probe = { CompletableDeferred<AsterReach>().also { answers += it }.await() },
+            now = { 1_000_000L },
+        )
+        probes.refresh(listOf("http://192.0.2.10/"))
+        probes.refresh(listOf("http://192.0.2.10/"), force = true)
+        answers[1].complete(AsterReach.Aster)
+        answers[0].complete(AsterReach.Unreachable)
+        assertEquals(listOf("http://192.0.2.10/" to AsterReach.Aster), found)
     }
 
     @Test

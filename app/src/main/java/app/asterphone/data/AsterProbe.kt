@@ -55,7 +55,8 @@ object AsterProbe {
 
 /**
  * Looks at panel addresses in the background and passes each result to [record]. An address is looked at once a minute at most,
- * however often it is asked for, unless the caller insists.
+ * however often it is asked for, unless the caller insists. Only the newest look at an address is recorded, so a slow one that
+ * ends after a newer one can't overwrite its result.
  */
 class AsterProbes(
     private val scope: CoroutineScope,
@@ -63,22 +64,27 @@ class AsterProbes(
     private val probe: suspend (AddressCheck.Valid) -> AsterReach = { AsterProbe.run(it) },
     private val now: () -> Long = { System.nanoTime() / 1_000_000 },
 ) {
-    private val started = HashMap<String, Long>()
+    private class Look(val time: Long, val number: Int)
+
+    private val looks = HashMap<String, Look>()
 
     /** Starts a look at each of [addresses] that has none under way or done within a minute; [force] skips that wait. */
     fun refresh(addresses: Collection<String>, force: Boolean = false) {
         for (address in addresses.distinct()) {
             val valid = AsterAddress.check(address) as? AddressCheck.Valid ?: continue
-            if (claim(address, force)) scope.launch { record(address, probe(valid)) }
+            val look = claim(address, force) ?: continue
+            scope.launch {
+                val reach = probe(valid)
+                synchronized(looks) { if (looks[address] === look) record(address, reach) }
+            }
         }
     }
 
-    private fun claim(address: String, force: Boolean): Boolean = synchronized(started) {
+    private fun claim(address: String, force: Boolean): Look? = synchronized(looks) {
         val time = now()
-        val last = started[address]
-        if (!force && last != null && time - last < MIN_INTERVAL_MILLIS) return false
-        started[address] = time
-        true
+        val last = looks[address]
+        if (!force && last != null && time - last.time < MIN_INTERVAL_MILLIS) return null
+        Look(time, (last?.number ?: 0) + 1).also { looks[address] = it }
     }
 
     companion object {

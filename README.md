@@ -18,8 +18,9 @@ reached over a LAN or a VPN.
 - An Aster tab shows the Aster web panel inside the app. Every SIP server of your accounts is looked at for an
   Aster on its plain web port (`api/health`); a bar at the top of the tab names the one shown, and tapping it
   opens a list of the Aster servers, the servers with none (greyed, with "Set address" for a panel on another
-  address) and "Add Aster panel" for one that no account points at. Each server keeps its own page, back
-  history and login. The tab only loads the chosen panel's address (plain HTTP is allowed for it) and opens
+  address) and "Add Aster panel" for one that no account points at. Each server keeps its own page and back
+  history, and its own login unless two panels share a host and differ only by port, as web views keep
+  cookies by host. The tab only loads the chosen panel's address (plain HTTP is allowed for it) and opens
   other links in the browser; you sign in on the panel's own page and the app never stores the password. The
   page is closed whenever the app is in the background or another panel is chosen, and comes back with its
   back history. An address typed without `http://` or `https://` is taken as `http://`. The Setup tab counts
