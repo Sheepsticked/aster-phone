@@ -26,6 +26,8 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import app.asterphone.call.CallScreen
 import app.asterphone.data.AsterModem
+import app.asterphone.data.AsterReach
+import app.asterphone.data.AsterServer
 import app.asterphone.data.ContactDirectory
 import app.asterphone.data.SimLine
 import app.asterphone.sip.AccountState
@@ -147,21 +149,93 @@ class ScreenRenderTest {
         SystemBars { AccountEditScreen(null, emptyList(), {}, {}, {}) }
     }
 
-    @Test fun setup() = render("setup") { App(Tab.Setup, setupNeedsAction = true) { SetupScreen(Samples.checks, Samples.accounts, detailedLog = false, onDetailedLog = {}, asterAddress = "http://192.0.2.10/", onEditAsterAddress = {}) } }
-
-    @Test
-    @Config(qualifiers = "w384dp-h832dp-xxhdpi")
-    fun asterAddress() = render("aster-address") { App(Tab.Aster) { AsterAddressScreen("http://192.0.2.10/", {}, null) } }
-
-    @Test
-    @Config(qualifiers = "w384dp-h832dp-xxhdpi")
-    fun asterAddressDark() = render("aster-address-dark", dark = true) { App(Tab.Aster) { AsterAddressScreen("http://192.0.2.10/", {}, null) } }
-
-    @Test
-    @Config(qualifiers = "w384dp-h832dp-xxhdpi")
-    fun asterAddressError() = render("aster-address-error", before = { compose.onNodeWithText("Open").performClick() }) {
-        App(Tab.Aster) { AsterAddressScreen("", {}, {}) }
+    @Test fun setup() = render("setup") {
+        App(Tab.Setup, setupNeedsAction = true) { SetupScreen(Samples.checks, Samples.accounts, detailedLog = false, onDetailedLog = {}, asterServers = servers, onOpenAsterPanels = {}) }
     }
+
+    private val officeHome = AsterServer("host:192.0.2.10", "Office, Home", "192.0.2.10", "http://192.0.2.10/", "http://192.0.2.10/", false, false, AsterReach.Aster)
+    private val cabin = AsterServer("host:cabin.example.com", "Cabin", "cabin.example.com", "http://cabin.example.com:5099/", "http://cabin.example.com/", true, false, AsterReach.Aster)
+    private val trunk = AsterServer("host:192.0.2.30", "Trunk", "192.0.2.30", "http://192.0.2.30/", "http://192.0.2.30/", false, false, AsterReach.NoAster)
+    private val spare = AsterServer("host:192.0.2.40", "Spare", "192.0.2.40", "http://192.0.2.40/", "http://192.0.2.40/", false, false, AsterReach.Unreachable)
+    private val added = AsterServer("panel:p1", "192.0.2.50:5098", "", "http://192.0.2.50:5098/", "http://192.0.2.50:5098/", true, true, AsterReach.Aster)
+    private val checking = officeHome.copy(reach = null)
+    private val servers = listOf(officeHome, cabin, trunk, spare, added)
+    private val actions = AsterTabActions({}, {}, {}, {}, {})
+
+    @Test
+    @Config(qualifiers = "w384dp-h832dp-xxhdpi")
+    fun asterAddress() = render("aster-address") { App(Tab.Aster) { AsterAddressScreen(cabin, {}, {}, null, {}) } }
+
+    @Test
+    @Config(qualifiers = "w384dp-h832dp-xxhdpi")
+    fun asterAddressDark() = render("aster-address-dark", dark = true) { App(Tab.Aster) { AsterAddressScreen(cabin, {}, {}, null, {}) } }
+
+    @Test
+    @Config(qualifiers = "w384dp-h832dp-xxhdpi")
+    fun asterAddressAddedPanel() = render("aster-address-added") { App(Tab.Aster) { AsterAddressScreen(added, {}, null, {}, {}) } }
+
+    @Test
+    @Config(qualifiers = "w384dp-h832dp-xxhdpi")
+    fun asterAddressError() = render("aster-address-error", before = { compose.onNodeWithText("Add").performClick() }) {
+        App(Tab.Aster) { AsterAddressScreen(null, {}, null, null, {}) }
+    }
+
+    @Test
+    @Config(qualifiers = "w384dp-h832dp-xxhdpi")
+    fun asterServerBar() = render("aster-bar") { App(Tab.Aster) { ServerBar(officeHome) } }
+
+    @Test
+    @Config(qualifiers = "w384dp-h832dp-xxhdpi")
+    fun asterServerBarDark() = render("aster-bar-dark", dark = true) { App(Tab.Aster) { ServerBar(cabin) } }
+
+    @Test
+    @Config(qualifiers = "w384dp-h832dp-xxhdpi")
+    fun asterServerBarUnreachable() = render("aster-bar-unreachable") { App(Tab.Aster) { ServerBar(spare) } }
+
+    @Test
+    @Config(qualifiers = "w384dp-h832dp-xxhdpi")
+    fun asterServerBarLargeFont() = render("aster-bar-large-font", fontScale = 1.3f) { App(Tab.Aster) { ServerBar(officeHome) } }
+
+    @Composable
+    private fun ServerBar(server: AsterServer) = Box(Modifier.fillMaxSize()) {
+        AsterServerBar(server, onClick = {}, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
+    }
+
+    @Composable
+    private fun ServerSheet(list: List<AsterServer>, currentKey: String?) = Surface(
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+    ) {
+        AsterServerPicker(list, currentKey, onSelect = {}, onRecheck = {}, onEdit = {}, onAdd = {})
+    }
+
+    @Test
+    @Config(qualifiers = "w384dp-h832dp-xxhdpi")
+    fun asterServerSheet() = render("aster-sheet") { SystemBars { ServerSheet(servers, officeHome.key) } }
+
+    @Test
+    @Config(qualifiers = "w384dp-h832dp-xxhdpi")
+    fun asterServerSheetDark() = render("aster-sheet-dark", dark = true) { SystemBars { ServerSheet(servers, cabin.key) } }
+
+    @Test
+    @Config(qualifiers = "w384dp-h832dp-xxhdpi")
+    fun asterServerSheetLargeFont() = render("aster-sheet-large-font", fontScale = 1.3f) { SystemBars { ServerSheet(servers, officeHome.key) } }
+
+    @Test
+    @Config(qualifiers = "w384dp-h832dp-xxhdpi")
+    fun asterNoServers() = render("aster-none") { App(Tab.Aster) { AsterNoServers(listOf(trunk, spare), actions) } }
+
+    @Test
+    @Config(qualifiers = "w384dp-h832dp-xxhdpi")
+    fun asterNoServersDark() = render("aster-none-dark", dark = true) { App(Tab.Aster) { AsterNoServers(listOf(trunk, spare), actions) } }
+
+    @Test
+    @Config(qualifiers = "w384dp-h832dp-xxhdpi")
+    fun asterLooking() = render("aster-looking") { App(Tab.Aster) { AsterNoServers(listOf(checking, trunk), actions) } }
+
+    @Test
+    @Config(qualifiers = "w384dp-h832dp-xxhdpi")
+    fun asterNoServersAtAll() = render("aster-no-accounts") { App(Tab.Aster) { AsterNoServers(emptyList(), actions) } }
 
     @Test
     @Config(qualifiers = "w384dp-h832dp-xxhdpi")
@@ -179,7 +253,7 @@ class ScreenRenderTest {
 
     @Test
     fun setupAsterRow() = render("setup-aster") {
-        App(Tab.Setup) { SetupScreen(Samples.checks.take(1), Samples.accounts.take(1), detailedLog = false, onDetailedLog = {}, asterAddress = null, onEditAsterAddress = {}) }
+        App(Tab.Setup) { SetupScreen(Samples.checks.take(1), Samples.accounts.take(1), detailedLog = false, onDetailedLog = {}, asterServers = listOf(trunk), onOpenAsterPanels = {}) }
     }
 
     @Test fun incomingCall() = render("call-incoming") { SystemBars { Call(Samples.incoming) } }

@@ -17,7 +17,7 @@ class AsterStatusTest {
     private val gsm2 = AsterModem("gsm2", "no-network", null, null)
     private val snapshot = AsterSnapshot(phones, listOf(gsm1, gsm2))
 
-    private fun query(username: String, host: String = "192.0.2.10", origin: AsterOrigin = panel) = SimQuery(username, host, origin)
+    private fun query(username: String, origin: AsterOrigin = panel) = SimQuery(username, origin)
 
     // Parsing
 
@@ -103,7 +103,7 @@ class AsterStatusTest {
 
     @Test
     fun findsTheModemOfAPhone() {
-        val line = snapshot.lineFor(query("504")) as SimLine.Through
+        val line = snapshot.lineFor("504") as SimLine.Through
         assertEquals(gsm1, line.modem)
         assertEquals("Calls go out through gsm1 ·\u00A0Example Mobile ·\u00A0+1234567890", line.text)
         assertFalse(line.problem)
@@ -113,28 +113,28 @@ class AsterStatusTest {
     @Test
     fun leavesOutWhatTheModemDoesntKnow() {
         val bare = AsterSnapshot(phones, listOf(gsm1.copy(provider = null), gsm2))
-        assertEquals("Calls go out through gsm1 ·\u00A0+1234567890", bare.lineFor(query("504"))!!.text)
+        assertEquals("Calls go out through gsm1 ·\u00A0+1234567890", bare.lineFor("504")!!.text)
         val withoutNumber = AsterSnapshot(phones, listOf(gsm1.copy(phoneNumber = null), gsm2))
-        assertEquals("Calls go out through gsm1 ·\u00A0Example Mobile", withoutNumber.lineFor(query("504"))!!.text)
+        assertEquals("Calls go out through gsm1 ·\u00A0Example Mobile", withoutNumber.lineFor("504")!!.text)
         val neither = AsterSnapshot(phones, listOf(gsm1.copy(provider = null, phoneNumber = null), gsm2))
-        assertEquals("Calls go out through gsm1", neither.lineFor(query("504"))!!.text)
+        assertEquals("Calls go out through gsm1", neither.lineFor("504")!!.text)
     }
 
     @Test
     fun warnsWhenTheModemIsNotReady() {
-        val line = snapshot.lineFor(query("511")) as SimLine.Through
+        val line = snapshot.lineFor("511") as SimLine.Through
         assertEquals("gsm2 is not ready (no network)", line.text)
         assertTrue(line.problem)
         assertEquals("/modems/gsm2", line.path)
         for (state in listOf("stopped", "connecting", "busy", "unverified", "absent")) {
             val other = AsterSnapshot(phones, listOf(gsm1.copy(state = state), gsm2))
-            assertEquals("gsm1 is not ready ($state)", other.lineFor(query("504"))!!.text)
+            assertEquals("gsm1 is not ready ($state)", other.lineFor("504")!!.text)
         }
     }
 
     @Test
     fun saysWhenAPhoneIsInternalOnly() {
-        val line = snapshot.lineFor(query("501"))
+        val line = snapshot.lineFor("501")
         assertEquals(SimLine.InternalOnly, line)
         assertEquals("Internal calls only", line!!.text)
         assertFalse(line.problem)
@@ -142,39 +142,19 @@ class AsterStatusTest {
     }
 
     @Test
-    fun showsNothingForAnotherServer() {
-        assertNull(snapshot.lineFor(query("504", host = "192.0.2.11")))
-        assertNull(snapshot.lineFor(query("501", host = "aster.example.com")))
-        assertNull(snapshot.lineFor(query("504", host = "192.0.2.1")))
-    }
-
-    @Test
-    fun comparesHostsWithoutCaseOrBrackets() {
-        val v6 = AsterOrigin("http", "[2001:db8::10]", 8080)
-        assertEquals(SimLine.InternalOnly, snapshot.lineFor(query("501", host = "2001:db8::10", origin = v6)))
-        assertEquals(SimLine.InternalOnly, snapshot.lineFor(query("501", host = "[2001:db8::10]", origin = v6)))
-        assertEquals(SimLine.InternalOnly, snapshot.lineFor(query("501", host = "2001:DB8::10", origin = v6)))
-        assertNull(snapshot.lineFor(query("501", host = "2001:db8::11", origin = v6)))
-        assertNull(snapshot.lineFor(query("501", host = "2001:db8::10")))
-        val named = AsterOrigin("http", "aster.example.com", 80)
-        assertEquals(SimLine.InternalOnly, snapshot.lineFor(query("501", host = "Aster.Example.com", origin = named)))
-        assertNull(snapshot.lineFor(query("501", host = "example.com", origin = named)))
-    }
-
-    @Test
     fun showsNothingForAPhoneAsterDoesntHave() {
-        assertNull(snapshot.lineFor(query("999")))
-        assertNull(snapshot.lineFor(query("")))
-        assertNull(snapshot.lineFor(query("50")))
-        assertNull(AsterSnapshot(emptyList(), emptyList()).lineFor(query("504")))
+        assertNull(snapshot.lineFor("999"))
+        assertNull(snapshot.lineFor(""))
+        assertNull(snapshot.lineFor("50"))
+        assertNull(AsterSnapshot(emptyList(), emptyList()).lineFor("504"))
     }
 
     @Test
     fun showsNothingForAModemItDoesntKnow() {
-        assertNull(snapshot.lineFor(query("512")))
-        assertNull(AsterSnapshot(phones, emptyList()).lineFor(query("504")))
+        assertNull(snapshot.lineFor("512"))
+        assertNull(AsterSnapshot(phones, emptyList()).lineFor("504"))
         // The phone is still known without its modem when it has none.
-        assertEquals(SimLine.InternalOnly, AsterSnapshot(phones, emptyList()).lineFor(query("501")))
+        assertEquals(SimLine.InternalOnly, AsterSnapshot(phones, emptyList()).lineFor("501"))
     }
 
     // The login cookie
@@ -251,7 +231,7 @@ class AsterStatusTest {
         val test = Source(answer = snapshot)
         val other = AsterOrigin("http", "192.0.2.20", 5099)
         test.line(query("501"))
-        assertEquals(SimLine.InternalOnly, test.line(query("501", host = "192.0.2.20", origin = other)))
+        assertEquals(SimLine.InternalOnly, test.line(query("501", origin = other)))
         assertEquals(listOf(panel, other), test.fetched.map { it.first })
     }
 
@@ -274,14 +254,6 @@ class AsterStatusTest {
         assertNull(test.line(query("501"), cookie = "theme=dark"))
         assertEquals(0, test.fetched.size)
         assertEquals(2, test.cookieAsked)
-    }
-
-    @Test
-    fun anotherServerAsksForNothing() {
-        val test = Source(answer = snapshot)
-        assertNull(test.line(query("501", host = "192.0.2.11")))
-        assertEquals(0, test.fetched.size)
-        assertEquals(0, test.cookieAsked)
     }
 
     @Test

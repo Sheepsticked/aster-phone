@@ -34,11 +34,12 @@ import java.io.ByteArrayInputStream
 enum class PanelStatus { Loading, Ready, Failed }
 
 /**
- * Owns the web view behind the Aster tab. The page keeps a live connection to the server for as long as the view
- * exists, so the view is dropped whenever the app leaves the foreground and made again, on the same page and with the
- * same back history, when the tab is next shown.
+ * Owns the web view behind the Aster tab. There is one view at a time, locked to one panel's address. The page keeps a live
+ * connection to the server for as long as the view exists, so the view is dropped whenever the app leaves the foreground or another
+ * panel is chosen, and made again, on the same page and with the same back history, when its panel is next shown. What each panel
+ * left behind is kept in memory by its address.
  */
-class AsterWebHost(private val context: Context, resumeUrl: String?) {
+class AsterWebHost(private val context: Context, resumeUrls: Map<String, String> = emptyMap()) {
     var status by mutableStateOf(PanelStatus.Loading)
         private set
     var retrying by mutableStateOf(false)
@@ -50,37 +51,48 @@ class AsterWebHost(private val context: Context, resumeUrl: String?) {
     var generation by mutableIntStateOf(0)
         private set
 
-    /** The page to come back to after the view was dropped. */
-    var resumeUrl: String? = resumeUrl
-        private set
-
-    /** What a dropped view had behind it: its saved state, and the page it was on. Kept in memory only. */
+    /** What a dropped view had behind it: its saved state, and the page it was on. */
     private class SavedHistory(val state: Bundle, val currentUrl: String)
 
+    /** Where a panel was left: the page to come back to, and what was behind it. */
+    private class Memory(var resumeUrl: String? = null, var history: SavedHistory? = null)
+
+    private val memory = HashMap<String, Memory>()
     private var webView: WebView? = null
-    private var history: SavedHistory? = null
     private var address: AddressCheck.Valid? = null
     private var failedUrl: String? = null
     private var loadFailed = false
     private var rendererLost = false
     private var attached = false
 
+    init {
+        resumeUrls.forEach { (panel, url) -> memory[panel] = Memory(resumeUrl = url) }
+    }
+
+    /** The page each panel is to come back to, by panel address: what survives the app being recreated. */
+    val resumeUrls: Map<String, String> get() = memory.mapNotNull { (panel, kept) -> kept.resumeUrl?.let { panel to it } }.toMap()
+
     /** The view for [address]: the one still alive, or a new one that opens the page left earlier. */
     fun obtainView(address: AddressCheck.Valid): WebView {
         attached = true
         webView?.let { view ->
-            (view.parent as? ViewGroup)?.removeView(view)
-            view.onResume()
-            return view
+            if (this.address == address) {
+                (view.parent as? ViewGroup)?.removeView(view)
+                view.onResume()
+                return view
+            }
+            // Another panel was chosen: let go of the old one, remembering where it was.
+            release(keepHistory = true, bumpGeneration = false)
         }
         this.address = address
         status = PanelStatus.Loading
         retrying = false
         canGoBack = false
         loadFailed = false
-        val first = resumeUrl?.takeIf { address.origin.allows(it) } ?: address.url
-        val saved = history
-        history = null
+        val kept = memory[address.url]
+        val first = kept?.resumeUrl?.takeIf { address.origin.allows(it) } ?: address.url
+        val saved = kept?.history
+        kept?.history = null
         val view = newView(address)
         webView = view
         if (rendererLost) {
@@ -109,39 +121,46 @@ class AsterWebHost(private val context: Context, resumeUrl: String?) {
 
     fun retry() {
         val view = webView ?: return
-        val target = failedUrl ?: resumeUrl ?: address?.url ?: return
+        val target = failedUrl ?: address?.let { memory[it.url]?.resumeUrl ?: it.url } ?: return
         retrying = true
         view.loadUrl(target)
     }
 
-    /** Shows [path] of the panel at [address]: in the view if one is alive, else as the first page of the next view. */
+    /** Shows [path] of the panel at [address]: in the view if it is the one alive, else as the first page of its next view. */
     fun open(address: AddressCheck.Valid, path: String) {
         val url = address.origin.urlFor(path)
-        resumeUrl = url
-        failedUrl = null
-        // A view that was dropped comes back on this page alone: its old history isn't put under it.
-        history = null
-        webView?.loadUrl(url)
+        // A panel whose view was dropped comes back on this page alone: its old history isn't put under it.
+        memory.getOrPut(address.url) { Memory() }.apply {
+            resumeUrl = url
+            history = null
+        }
+        if (this.address == address) {
+            failedUrl = null
+            webView?.loadUrl(url)
+        }
     }
 
-    /** Drops the view, its page and its history: the next view opens the saved address from the start. */
-    fun reset() {
-        resumeUrl = null
-        failedUrl = null
-        history = null
-        destroyView()
+    /** Forgets the page and history of the panel at [address], and drops its view if that is the one alive. */
+    fun reset(address: AddressCheck.Valid) {
+        memory.remove(address.url)
+        if (this.address == address) {
+            failedUrl = null
+            destroyView()
+        }
     }
 
     /** Remembers the current page and what is behind it, and destroys the view, which closes the page's connections. */
     fun release() = release(keepHistory = true)
 
-    private fun release(keepHistory: Boolean) {
+    private fun release(keepHistory: Boolean, bumpGeneration: Boolean = true) {
         val view = webView ?: return
-        view.url?.takeIf { address?.origin?.allows(it) == true }?.let { url ->
-            resumeUrl = url
-            if (keepHistory) history = saveHistory(view)
+        val panel = address
+        view.url?.takeIf { panel?.origin?.allows(it) == true }?.let { url ->
+            val kept = memory.getOrPut(panel!!.url) { Memory() }
+            kept.resumeUrl = url
+            if (keepHistory) kept.history = saveHistory(view)
         }
-        destroyView()
+        destroyView(bumpGeneration)
     }
 
     private fun saveHistory(view: WebView): SavedHistory? {
@@ -150,7 +169,7 @@ class AsterWebHost(private val context: Context, resumeUrl: String?) {
         return SavedHistory(state, current).takeIf { address?.origin?.allows(current) == true }
     }
 
-    private fun destroyView() {
+    private fun destroyView(bumpGeneration: Boolean = true) {
         val view = webView ?: return
         webView = null
         CookieManager.getInstance().flush()
@@ -159,7 +178,7 @@ class AsterWebHost(private val context: Context, resumeUrl: String?) {
         view.webViewClient = WebViewClient()
         view.destroy()
         canGoBack = false
-        generation++
+        if (bumpGeneration) generation++
     }
 
     @SuppressLint("SetJavaScriptEnabled")

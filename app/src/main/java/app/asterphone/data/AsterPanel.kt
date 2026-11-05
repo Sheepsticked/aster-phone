@@ -1,6 +1,5 @@
 package app.asterphone.data
 
-import android.content.Context
 import java.net.URLDecoder
 
 /** The scheme, host and port the Aster tab may load. */
@@ -20,11 +19,23 @@ sealed interface AddressCheck {
     data class Invalid(val reason: String) : AddressCheck
 }
 
-/** The address of the Aster web panel: a suggestion from the SIP accounts, and the rules for what may be saved. */
+/** The address of an Aster web panel: the one assumed for a SIP server, and the rules for what may be saved. */
 object AsterAddress {
-    /** The server of the first account that is turned on, as a web address; empty without one. */
-    fun defaultFor(accounts: List<SipAccount>): String =
-        accounts.firstOrNull { it.enabled }?.let { "http://${it.uriHost()}/" }.orEmpty()
+    /** Where Aster is assumed to be on the SIP server of [account]: the plain web port of its host. */
+    fun defaultFor(account: SipAccount): String = "http://${account.uriHost().lowercase()}/"
+
+    /** [address] as short as it can be and still say where it is: no http://, no root path. */
+    fun shortName(address: String): String {
+        val valid = check(address) as? AddressCheck.Valid ?: return address
+        val rest = valid.url.substringAfter("://").removeSuffix("/")
+        return if (valid.origin.scheme == "https") "https://$rest" else rest
+    }
+
+    /** The address the panel's health answer is read from: `api/health` under [address]. */
+    fun healthUrl(address: AddressCheck.Valid): String {
+        val base = address.url.substringBefore('#').substringBefore('?')
+        return (if (base.endsWith("/")) base else "$base/") + "api/health"
+    }
 
     /** Parses what was typed into the URL to open and its origin, or says what is wrong with it. Without a scheme it is http. */
     fun check(text: String): AddressCheck {
@@ -107,18 +118,4 @@ object AsterDownloads {
         name.substringAfterLast('/').substringAfterLast('\\')
             .filter { it.code >= 32 && it !in "\"*:<>?|" }
             .trim().trimStart('.').take(MAX_LENGTH).trimEnd('.', ' ')
-}
-
-/** The saved address of the Aster web panel. It is not a secret, so it lives in plain preferences. */
-class AsterPanelSettings(context: Context) {
-    private val prefs = context.applicationContext.getSharedPreferences("aster_panel", Context.MODE_PRIVATE)
-
-    /** The saved address, or null when none was saved or what is stored can't be used. */
-    var address: String?
-        get() = prefs.getString(KEY, null)?.takeIf { AsterAddress.check(it) is AddressCheck.Valid }
-        set(value) = prefs.edit().apply { if (value == null) remove(KEY) else putString(KEY, value) }.apply()
-
-    private companion object {
-        const val KEY = "address"
-    }
 }

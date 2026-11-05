@@ -15,15 +15,20 @@ reached over a LAN or a VPN.
   next to Call opens the phone's contact picker. Contacts are read on the phone only and never sent anywhere
 - Call history: tapping an entry puts its number in the dialer, with the account it used when that is still on;
   the phone icon calls back at once through the same account
-- An Aster tab shows the Aster web panel inside the app. It asks for the panel's address once and offers the
-  server of the first account. The tab only loads that address (plain HTTP is allowed for it) and opens other
-  links in the browser; you sign in on the panel's own page and the app never stores the password. The page
-  is closed whenever the app is in the background, and comes back with its back history. An address typed
-  without `http://` or `https://` is taken as `http://`
-- When the selected account is a phone of that Aster, the dialer shows one line under the account bar: the
-  modem its calls go out through, in red when the modem isn't ready, or that calls stay internal. Tapping it
-  opens that page in the Aster tab. The line comes from Aster's phones and modems lists, read with the panel's
-  login cookie while the dialer is on screen; without a login or on any error it isn't shown
+- An Aster tab shows the Aster web panel inside the app. Every SIP server of your accounts is looked at for an
+  Aster on its plain web port (`api/health`); a bar at the top of the tab names the one shown, and tapping it
+  opens a list of the Aster servers, the servers with none (greyed, with "Set address" for a panel on another
+  address) and "Add Aster panel" for one that no account points at. Each server keeps its own page, back
+  history and login. The tab only loads the chosen panel's address (plain HTTP is allowed for it) and opens
+  other links in the browser; you sign in on the panel's own page and the app never stores the password. The
+  page is closed whenever the app is in the background or another panel is chosen, and comes back with its
+  back history. An address typed without `http://` or `https://` is taken as `http://`. The Setup tab counts
+  the Aster panels found and opens the list
+- When the selected account is a phone of the Aster on its own server, the dialer shows one line under the
+  account bar: the modem its calls go out through, in red when the modem isn't ready, or that calls stay
+  internal. Tapping it opens that page in the Aster tab. The line comes from Aster's phones and modems lists,
+  read with the panel's login cookie while the dialer is on screen; without a login or on any error it isn't
+  shown
 - A setup checklist for the Android and Samsung battery settings that would otherwise stop background calls
 
 Calls use G.711 (PCMA/PCMU) over UDP or TCP. TLS, video and messaging are out of scope.
@@ -55,7 +60,8 @@ echo "sdk.dir=$HOME/Android/Sdk" > local.properties
 
 The APK is written to `app/build/outputs/apk/debug/`. The debug build installs next to the release app and has
 a blue launcher icon, so the two can be told apart. The unit tests include Compose UI tests that run on the
-JVM through Robolectric and save a PNG of every screen to `app/build/screenshots/`.
+JVM through Robolectric and save a PNG of every screen to `app/build/screenshots/`. The web view's layout is
+checked by an instrumented test, which needs a device or emulator: `./gradlew connectedDebugAndroidTest`.
 
 Release builds are signed when a properties file exists at `~/.android-keys/asterphone-signing.properties`
 (or the path given with `-Pasterphone.signing=...`) containing `storeFile`, `storePassword`, `keyAlias` and

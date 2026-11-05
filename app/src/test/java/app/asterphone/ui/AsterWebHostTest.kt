@@ -7,6 +7,7 @@ import android.content.Intent
 import android.net.Uri
 import android.net.http.SslCertificate
 import android.net.http.SslError
+import android.view.ViewGroup
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import android.webkit.TestSslErrorHandler
@@ -41,7 +42,7 @@ class AsterWebHostTest {
 
     @Before
     fun setUp() {
-        host = AsterWebHost(activity, null)
+        host = AsterWebHost(activity)
     }
 
     private fun client(view: WebView) = shadowOf(view).webViewClient
@@ -77,6 +78,14 @@ class AsterWebHostTest {
         val first = host.obtainView(address)
         host.detach(first)
         assertSame(first, host.obtainView(address))
+    }
+
+    @Test
+    fun fillsTheSpaceItIsGiven() {
+        // A web view that counts as wrap-content gives its page a layout height of zero, so vh units come out as 0.
+        val params = host.obtainView(address).layoutParams
+        assertEquals(ViewGroup.LayoutParams.MATCH_PARENT, params.width)
+        assertEquals(ViewGroup.LayoutParams.MATCH_PARENT, params.height)
     }
 
     @Test
@@ -237,7 +246,7 @@ class AsterWebHostTest {
         host.release()
         assertTrue(shadowOf(view).wasDestroyCalled())
         assertEquals(generation + 1, host.generation)
-        assertEquals("http://192.0.2.10:5099/messages", host.resumeUrl)
+        assertEquals("http://192.0.2.10:5099/messages", host.resumeUrls[address.url])
 
         val next = host.obtainView(address)
         assertNotSame(view, next)
@@ -255,15 +264,15 @@ class AsterWebHostTest {
     fun resetForgetsThePageAndStartsFromTheAddress() {
         val view = host.obtainView(address)
         shadowOf(view).pushEntryToHistory("http://192.0.2.10:5099/messages")
-        host.reset()
+        host.reset(address)
         assertTrue(shadowOf(view).wasDestroyCalled())
-        assertNull(host.resumeUrl)
+        assertNull(host.resumeUrls[address.url])
         assertEquals("http://192.0.2.10:5099/", shadowOf(host.obtainView(address)).lastLoadedUrl)
     }
 
     @Test
     fun ignoresASavedPageOnAnotherOrigin() {
-        val resuming = AsterWebHost(activity, "http://example.com/phish")
+        val resuming = AsterWebHost(activity, mapOf(address.url to "http://example.com/phish"))
         assertEquals("http://192.0.2.10:5099/", shadowOf(resuming.obtainView(address)).lastLoadedUrl)
     }
 
@@ -353,7 +362,7 @@ class AsterWebHostTest {
         val view = host.obtainView(address)
         browse(view, "/calls", "/calls/12")
         host.release()
-        host.reset()
+        host.reset(address)
 
         val next = host.obtainView(address)
         assertEquals("http://192.0.2.10:5099/", shadowOf(next).lastLoadedUrl)
@@ -413,5 +422,71 @@ class AsterWebHostTest {
         client(view).onPageStarted(view, "http://192.0.2.10:5099/phones", null)
         assertEquals(PanelStatus.Loading, host.status)
         assertEquals("http://192.0.2.10:5099/phones", shadowOf(view).lastLoadedUrl)
+    }
+
+    private val other = AsterAddress.check("http://192.0.2.20:5098/") as AddressCheck.Valid
+
+    @Test
+    fun anotherPanelReplacesTheViewAndOpensItsOwnPage() {
+        val first = host.obtainView(address)
+        val second = host.obtainView(other)
+        assertNotSame(first, second)
+        assertTrue(shadowOf(first).wasDestroyCalled())
+        assertEquals("http://192.0.2.20:5098/", shadowOf(second).lastLoadedUrl)
+        assertEquals(PanelStatus.Loading, host.status)
+        assertFalse(host.canGoBack)
+    }
+
+    @Test
+    fun eachPanelComesBackOnItsOwnPageWithItsOwnHistory() {
+        val first = host.obtainView(address)
+        browse(first, "/calls", "/calls/12")
+        val second = host.obtainView(other)
+        shadowOf(second).pushEntryToHistory("http://192.0.2.20:5098/settings")
+
+        val back = host.obtainView(address)
+        assertEquals("http://192.0.2.10:5099/calls/12", back.url)
+        assertTrue(back.canGoBack())
+        host.goBack()
+        assertEquals("http://192.0.2.10:5099/calls", back.url)
+
+        val again = host.obtainView(other)
+        assertEquals("http://192.0.2.20:5098/settings", again.url)
+        assertFalse("the other panel's pages aren't in this history", again.canGoBack())
+    }
+
+    @Test
+    fun openShowsAPageOfAPanelThatIsNotOnScreen() {
+        host.obtainView(address)
+        host.open(other, "/modems/gsm1")
+        val view = host.obtainView(other)
+        assertEquals("http://192.0.2.20:5098/modems/gsm1", shadowOf(view).lastLoadedUrl)
+        assertEquals("http://192.0.2.20:5098/modems/gsm1", host.resumeUrls[other.url])
+    }
+
+    @Test
+    fun openLoadsInTheViewThatIsAlive() {
+        val view = host.obtainView(address)
+        browse(view, "/calls")
+        host.open(address, "/modems/gsm1")
+        assertEquals("http://192.0.2.10:5099/modems/gsm1", shadowOf(view).lastLoadedUrl)
+    }
+
+    @Test
+    fun resettingOnePanelLeavesTheOthersAlone() {
+        host.obtainView(address)
+        host.open(other, "/phones")
+        host.reset(address)
+        assertNull(host.resumeUrls[address.url])
+        assertEquals("http://192.0.2.20:5098/phones", host.resumeUrls[other.url])
+    }
+
+    @Test
+    fun theKeptPagesSurviveARecreatedHost() {
+        val view = host.obtainView(address)
+        browse(view, "/calls")
+        host.release()
+        val restored = AsterWebHost(activity, host.resumeUrls)
+        assertEquals("http://192.0.2.10:5099/calls", shadowOf(restored.obtainView(address)).lastLoadedUrl)
     }
 }

@@ -14,34 +14,40 @@ class AsterPanelTest {
     private fun problem(text: String) = (AsterAddress.check(text) as AddressCheck.Invalid).reason
 
     @Test
-    fun suggestsTheFirstAccountsServer() {
-        assertEquals("http://192.0.2.10/", AsterAddress.defaultFor(listOf(account("192.0.2.10"), account("192.0.2.20"))))
-        assertEquals("http://aster.example.com/", AsterAddress.defaultFor(listOf(account("aster.example.com"))))
+    fun suggestsThePlainWebPortOfTheServer() {
+        assertEquals("http://192.0.2.10/", AsterAddress.defaultFor(account("192.0.2.10")))
+        assertEquals("http://aster.example.com/", AsterAddress.defaultFor(account("Aster.Example.com")))
     }
 
     @Test
     fun bracketsIpv6Servers() {
-        assertEquals("http://[2001:db8::10]/", AsterAddress.defaultFor(listOf(account("2001:db8::10"))))
-        assertEquals("http://[2001:db8::10]/", AsterAddress.defaultFor(listOf(account("[2001:db8::10]"))))
-    }
-
-    @Test
-    fun suggestsNothingWithoutAnAccount() {
-        assertEquals("", AsterAddress.defaultFor(emptyList()))
-    }
-
-    @Test
-    fun skipsAccountsThatAreTurnedOff() {
-        val accounts = listOf(account("192.0.2.10", enabled = false), account("192.0.2.20"))
-        assertEquals("http://192.0.2.20/", AsterAddress.defaultFor(accounts))
-        assertEquals("", AsterAddress.defaultFor(listOf(account("192.0.2.10", enabled = false))))
+        assertEquals("http://[2001:db8::10]/", AsterAddress.defaultFor(account("2001:db8::10")))
+        assertEquals("http://[2001:db8::10]/", AsterAddress.defaultFor(account("[2001:db8::10]")))
     }
 
     @Test
     fun suggestedAddressesAreValid() {
         for (host in listOf("192.0.2.10", "aster.example.com", "2001:db8::10")) {
-            assertTrue(AsterAddress.check(AsterAddress.defaultFor(listOf(account(host)))) is AddressCheck.Valid)
+            assertTrue(AsterAddress.check(AsterAddress.defaultFor(account(host))) is AddressCheck.Valid)
         }
+    }
+
+    @Test
+    fun namesAnAddressAsShortAsItCanBe() {
+        assertEquals("192.0.2.10", AsterAddress.shortName("http://192.0.2.10/"))
+        assertEquals("192.0.2.10:5099", AsterAddress.shortName("http://192.0.2.10:5099/"))
+        assertEquals("https://aster.example.com", AsterAddress.shortName("https://aster.example.com/"))
+        assertEquals("192.0.2.10/panel", AsterAddress.shortName("http://192.0.2.10/panel/"))
+        assertEquals("not an address", AsterAddress.shortName("not an address"))
+    }
+
+    @Test
+    fun asksForTheHealthAnswerUnderTheAddress() {
+        fun health(text: String) = AsterAddress.healthUrl(AsterAddress.check(text) as AddressCheck.Valid)
+        assertEquals("http://192.0.2.10/api/health", health("http://192.0.2.10"))
+        assertEquals("http://192.0.2.10:5099/api/health", health("http://192.0.2.10:5099/"))
+        assertEquals("https://aster.example.com/aster/api/health", health("https://aster.example.com/aster/"))
+        assertEquals("https://aster.example.com/aster/api/health", health("https://aster.example.com/aster?x=1#top"))
     }
 
     @Test

@@ -23,8 +23,8 @@ android {
         applicationId = "app.asterphone"
         minSdk = 29
         targetSdk = 36
-        versionCode = 13
-        versionName = "0.7.1"
+        versionCode = 14
+        versionName = "0.8.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         // The SIP library ships native code for four ABIs; current phones only need arm64.

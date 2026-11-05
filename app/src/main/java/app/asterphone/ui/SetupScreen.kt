@@ -57,6 +57,7 @@ import androidx.core.content.UnusedAppRestrictionsConstants
 import androidx.core.net.toUri
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import app.asterphone.Notifications
+import app.asterphone.data.AsterServer
 import app.asterphone.data.PhoneContacts
 import app.asterphone.sip.AccountState
 import app.asterphone.sip.SipEngine
@@ -246,8 +247,8 @@ fun SetupScreen(
     accounts: List<AccountState>,
     detailedLog: Boolean,
     onDetailedLog: (Boolean) -> Unit,
-    asterAddress: String?,
-    onEditAsterAddress: () -> Unit,
+    asterServers: List<AsterServer>,
+    onOpenAsterPanels: () -> Unit,
 ) {
     val todo = checks.count { it.needsAction }
     LazyColumn(contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -282,18 +283,19 @@ fun SetupScreen(
             }
         }
         item {
-            Card(onClick = onEditAsterAddress, modifier = Modifier.fillMaxWidth()) {
+            val found = asterServers.count { it.isAster }
+            Card(onClick = onOpenAsterPanels, modifier = Modifier.fillMaxWidth().testTag("aster-panels-row")) {
                 Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
-                        Text("Aster panel", style = MaterialTheme.typography.titleMedium)
+                        Text("Aster panels", style = MaterialTheme.typography.titleMedium)
                         Text(
-                            asterAddress ?: "No address yet",
+                            if (found == 0) "None found" else "$found found",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
                     Spacer(Modifier.width(12.dp))
-                    Text(if (asterAddress == null) "Set" else "Change", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+                    Text("Open", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
                 }
             }
         }

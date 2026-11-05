@@ -137,7 +137,7 @@ class AsterApiTest {
     fun theSourceAsksTheServerOnlyWhenItHasALogin() {
         asterRoutes()
         val source = AsterStatusSource()
-        val query = SimQuery("504", "127.0.0.1", origin)
+        val query = SimQuery("504", origin)
         assertNull(runBlocking { source.lineFor(query) { null } })
         assertEquals(0, requests.size)
 

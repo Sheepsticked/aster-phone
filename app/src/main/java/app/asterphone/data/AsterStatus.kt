@@ -19,8 +19,8 @@ data class AsterModem(val id: String, val state: String, val provider: String?, 
 /** What Aster said about its phones and modems. Nothing else of its answers is kept. */
 data class AsterSnapshot(val phones: List<AsterPhone>, val modems: List<AsterModem>)
 
-/** Whose route to look up: the SIP account's extension and server, and the panel the answer comes from. */
-data class SimQuery(val username: String, val accountHost: String, val panel: AsterOrigin)
+/** Whose route to look up: the SIP account's extension, and the panel of the Aster on the account's own server. */
+data class SimQuery(val username: String, val panel: AsterOrigin)
 
 /** The line under the account bar: which SIM the selected account calls out through. */
 sealed interface SimLine {
@@ -57,10 +57,9 @@ sealed interface SimLine {
     }
 }
 
-/** The line for [query] in this snapshot, or null when the account isn't a phone of this Aster or its modem is unknown. */
-fun AsterSnapshot.lineFor(query: SimQuery): SimLine? {
-    if (!AsterStatus.sameHost(query.accountHost, query.panel.host)) return null
-    val phone = phones.firstOrNull { it.number == query.username } ?: return null
+/** The line for [username] in this snapshot, or null when it isn't a phone of this Aster or its modem is unknown. */
+fun AsterSnapshot.lineFor(username: String): SimLine? {
+    val phone = phones.firstOrNull { it.number == username } ?: return null
     val modemId = phone.outbound ?: return SimLine.InternalOnly
     return modems.firstOrNull { it.id == modemId }?.let { SimLine.Through(it) }
 }
@@ -73,11 +72,6 @@ object AsterStatus {
     private const val MAX_BYTES = 1 shl 20
     private const val MAX_TEXT = 40
     private val MODEM_ID = Regex("[A-Za-z0-9_-]{1,32}")
-
-    /** True when the SIP server [accountHost] and the panel's [panelHost] are one host: same text, brackets and case aside. */
-    fun sameHost(accountHost: String, panelHost: String): Boolean = bare(accountHost).equals(bare(panelHost), ignoreCase = true)
-
-    private fun bare(host: String) = host.trim().removePrefix("[").removeSuffix("]")
 
     /** The `aster_sid=…` pair of a cookie header, or null without one. The page's other cookies are not passed on. */
     fun sessionCookie(header: String?): String? =
@@ -137,6 +131,8 @@ object AsterStatus {
             connection.readTimeout = timeoutMillis
             // A redirect would carry the cookie to wherever it points.
             connection.instanceFollowRedirects = false
+            // No kept-alive socket is left behind once the answer is read.
+            connection.setRequestProperty("Connection", "close")
             connection.setRequestProperty("Cookie", session)
             connection.setRequestProperty("Accept", "application/json")
             if (connection.responseCode != HttpURLConnection.HTTP_OK) return null
@@ -145,46 +141,44 @@ object AsterStatus {
             connection.disconnect()
         }
     }
+}
 
-    private fun InputStream.readText(limit: Int): String? {
-        val out = ByteArrayOutputStream()
-        val buffer = ByteArray(8 * 1024)
-        while (true) {
-            val count = read(buffer)
-            if (count < 0) return String(out.toByteArray(), Charsets.UTF_8)
-            out.write(buffer, 0, count)
-            if (out.size() > limit) return null
-        }
+/** The text of this stream as UTF-8, or null when it runs past [limit] bytes. */
+internal fun InputStream.readText(limit: Int): String? {
+    val out = ByteArrayOutputStream()
+    val buffer = ByteArray(8 * 1024)
+    while (true) {
+        val count = read(buffer)
+        if (count < 0) return String(out.toByteArray(), Charsets.UTF_8)
+        out.write(buffer, 0, count)
+        if (out.size() > limit) return null
     }
 }
 
 /**
- * Looks up [SimLine]s and keeps the last answer from one panel and login for a minute, so coming back to the dialer doesn't ask
+ * Looks up [SimLine]s and keeps the last answer from each panel and login for a minute, so coming back to the dialer doesn't ask
  * again. Failures aren't kept: logging in to the panel and returning should show the line at once. Call it from one thread.
  */
 class AsterStatusSource(
     private val fetch: suspend (AsterOrigin, String) -> AsterSnapshot? = { origin, session -> AsterStatus.fetch(origin, session) },
     private val now: () -> Long = { System.nanoTime() / 1_000_000 },
 ) {
-    private class Kept(val origin: AsterOrigin, val session: String, val snapshot: AsterSnapshot, val at: Long)
+    private class Kept(val session: String, val snapshot: AsterSnapshot, val at: Long)
 
-    private var kept: Kept? = null
+    private val kept = HashMap<AsterOrigin, Kept>()
 
     /** The line for [query], or null. [cookie] gives the panel's cookie header; without a login nothing is shown or kept. */
-    suspend fun lineFor(query: SimQuery, cookie: () -> String?): SimLine? {
-        if (!AsterStatus.sameHost(query.accountHost, query.panel.host)) return null
-        return snapshotOf(query.panel, cookie)?.lineFor(query)
-    }
+    suspend fun lineFor(query: SimQuery, cookie: () -> String?): SimLine? = snapshotOf(query.panel, cookie)?.lineFor(query.username)
 
     private suspend fun snapshotOf(panel: AsterOrigin, cookie: () -> String?): AsterSnapshot? {
         val session = AsterStatus.sessionCookie(cookie())
         if (session == null) {
-            kept = null
+            kept.remove(panel)
             return null
         }
-        kept?.takeIf { it.origin == panel && it.session == session && now() - it.at < MAX_AGE_MILLIS }?.let { return it.snapshot }
+        kept[panel]?.takeIf { it.session == session && now() - it.at < MAX_AGE_MILLIS }?.let { return it.snapshot }
         val fresh = fetch(panel, session) ?: return null
-        kept = Kept(panel, session, fresh, now())
+        kept[panel] = Kept(session, fresh, now())
         return fresh
     }
 

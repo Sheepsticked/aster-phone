@@ -42,10 +42,10 @@ import androidx.lifecycle.compose.currentStateAsState
 import app.asterphone.Notifications
 import app.asterphone.R
 import app.asterphone.data.AccountStore
-import app.asterphone.data.AddressCheck
-import app.asterphone.data.AsterAddress
 import app.asterphone.data.AsterOrigin
 import app.asterphone.data.AsterPanelSettings
+import app.asterphone.data.AsterProbes
+import app.asterphone.data.AsterServers
 import app.asterphone.data.AsterStatusSource
 import app.asterphone.data.PhoneContacts
 import app.asterphone.data.SimLine
@@ -53,6 +53,7 @@ import app.asterphone.data.SimQuery
 import app.asterphone.sip.RegistrationStatus
 import app.asterphone.sip.SipEngine
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 /** Bottom bar tabs, with a filled icon for the selected tab and an outlined one otherwise. */
@@ -67,8 +68,18 @@ enum class Tab(val label: String, @param:DrawableRes val selectedIcon: Int, @par
 
 private const val NEW_ACCOUNT = ""
 
+// Stands for the panel to add in the key of the server being edited.
+private const val NEW_PANEL = ""
+
 @Composable
-fun AppRoot(store: AccountStore, panel: AsterPanelSettings, requestedTab: Tab?, onTabHandled: () -> Unit, onOpenCall: () -> Unit) {
+fun AppRoot(
+    store: AccountStore,
+    panel: AsterPanelSettings,
+    probes: AsterProbes,
+    requestedTab: Tab?,
+    onTabHandled: () -> Unit,
+    onOpenCall: () -> Unit,
+) {
     val accounts by SipEngine.accounts.collectAsStateWithLifecycle()
     val history by SipEngine.history.collectAsStateWithLifecycle()
     val call by SipEngine.call.collectAsStateWithLifecycle()
@@ -82,23 +93,33 @@ fun AppRoot(store: AccountStore, panel: AsterPanelSettings, requestedTab: Tab?, 
     var dialerNumber by rememberSaveable { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
-    var asterAddress by remember { mutableStateOf(panel.address) }
-    var changingAsterAddress by rememberSaveable { mutableStateOf(false) }
+    val panelData by panel.data.collectAsStateWithLifecycle()
+    val servers = remember(accounts, panelData) { AsterServers.build(accounts.map { it.account }, panelData) }
+    val currentServer = remember(servers, panelData.selected) { AsterServers.current(servers, panelData.selected) }
+    var asterSheet by rememberSaveable { mutableStateOf(false) }
+    // The key of the server whose address is being edited, NEW_PANEL for a panel to add.
+    var editingAster by rememberSaveable { mutableStateOf<String?>(null) }
     // The web view lives as long as the screen does, but only while the app is in the foreground.
-    val asterHost = rememberSaveable(saver = Saver(save = { it.resumeUrl }, restore = { AsterWebHost(context, it) })) {
-        AsterWebHost(context, null)
+    val asterHost = rememberSaveable(saver = Saver<AsterWebHost, HashMap<String, String>>(save = { HashMap(it.resumeUrls) }, restore = { AsterWebHost(context, it) })) {
+        AsterWebHost(context)
     }
     LifecycleEventEffect(Lifecycle.Event.ON_STOP) { asterHost.release() }
     DisposableEffect(asterHost) { onDispose { asterHost.release() } }
 
-    // The dialer's line about the SIM the selected account calls out through, looked up in Aster while the dialer is on screen.
-    val panelAddress = remember(asterAddress) { asterAddress?.let { AsterAddress.check(it) } as? AddressCheck.Valid }
     val lifecycleState by LocalLifecycleOwner.current.lifecycle.currentStateAsState()
-    val callAccount = dialerAccount(accounts, dialAccount)?.account
-    val simQuery = remember(callAccount?.username, callAccount?.host, panelAddress?.origin) {
-        if (callAccount == null || panelAddress == null) null else SimQuery(callAccount.username, callAccount.host, panelAddress.origin)
+    val foreground = lifecycleState.isAtLeast(Lifecycle.State.STARTED)
+    LaunchedEffect(Unit) { panel.migrateLegacyAddress(store.accounts.first()) }
+    // Each server's address is looked at when the tab, the Setup tab's count or the list is shown; a minute has to pass between looks.
+    val addresses = servers.map { it.address }
+    val looking = foreground && (tab == Tab.Aster || tab == Tab.Setup)
+    LaunchedEffect(looking, asterSheet, addresses) {
+        if (looking) probes.refresh(addresses)
     }
-    val simLine = rememberSimLine(simQuery, watching = tab == Tab.Dial && editingId == null && lifecycleState.isAtLeast(Lifecycle.State.STARTED))
+
+    // The dialer's line about the SIM the selected account calls out through, looked up in the Aster of that account's own server.
+    val callAccount = dialerAccount(accounts, dialAccount)?.account
+    val simQuery = remember(callAccount, servers) { callAccount?.let { AsterServers.simQueryFor(it, servers) } }
+    val simLine = rememberSimLine(simQuery, watching = tab == Tab.Dial && editingId == null && foreground)
 
     LaunchedEffect(requestedTab) {
         if (requestedTab != null) {
@@ -137,6 +158,35 @@ fun AppRoot(store: AccountStore, panel: AsterPanelSettings, requestedTab: Tab?, 
         PhoneContacts.setAsked(context)
         contactsAsked = true
         if (granted) PhoneContacts.start(context)
+    }
+
+    editingAster?.let { key ->
+        val server = servers.firstOrNull { it.key == key }
+        if (key != NEW_PANEL && server == null) {
+            editingAster = null
+        } else {
+            val save: (String) -> Unit = { address ->
+                // What the old address left behind is of no use at the new one.
+                server?.panel?.takeIf { it.url != address }?.let(asterHost::reset)
+                panel.update { it.withServerAddress(server, servers, address) }
+                probes.refresh(listOf(address), force = true)
+                editingAster = null
+            }
+            AsterAddressScreen(
+                server = server,
+                onSave = save,
+                onUseDefault = if (server != null && !server.added && server.custom) ({ save(server.defaultAddress) }) else null,
+                onRemove = if (server != null && server.added) {
+                    {
+                        server.panel?.let(asterHost::reset)
+                        panel.update { it.withoutPanel(server.key.removePrefix(AsterServers.PANEL)) }
+                        editingAster = null
+                    }
+                } else null,
+                onClose = { editingAster = null },
+            )
+            return
+        }
     }
 
     editingId?.let { id ->
@@ -180,8 +230,12 @@ fun AppRoot(store: AccountStore, panel: AsterPanelSettings, requestedTab: Tab?, 
                     onPrefillConsumed = { dialerNumber = null },
                     simLine = simLine,
                     onOpenSimLine = { line ->
-                        panelAddress?.let { asterHost.open(it, line.path) }
-                        changingAsterAddress = false
+                        val server = callAccount?.let { account -> servers.firstOrNull { it.key == AsterServers.keyOf(account) } }
+                        server?.panel?.let { address ->
+                            asterHost.open(address, line.path)
+                            panel.update { it.withSelected(server.key) }
+                        }
+                        asterSheet = false
                         tab = Tab.Aster
                     },
                 )
@@ -207,25 +261,27 @@ fun AppRoot(store: AccountStore, panel: AsterPanelSettings, requestedTab: Tab?, 
                     accounts = accounts,
                     detailedLog = detailedLog,
                     onDetailedLog = SipEngine::setDetailedLog,
-                    asterAddress = asterAddress,
-                    onEditAsterAddress = {
-                        changingAsterAddress = true
+                    asterServers = servers,
+                    onOpenAsterPanels = {
+                        asterSheet = currentServer != null
                         tab = Tab.Aster
                     },
                 )
                 Tab.Aster -> AsterPanelTab(
                     host = asterHost,
-                    savedAddress = asterAddress,
-                    suggestedAddress = AsterAddress.defaultFor(accounts.map { it.account }),
-                    changingAddress = changingAsterAddress,
-                    onSaveAddress = { url ->
-                        panel.address = url
-                        asterAddress = url
-                        changingAsterAddress = false
-                        asterHost.reset()
-                    },
-                    onChangeAddress = { changingAsterAddress = true },
-                    onCancelChange = { changingAsterAddress = false },
+                    servers = servers,
+                    current = currentServer,
+                    sheetOpen = asterSheet,
+                    actions = AsterTabActions(
+                        select = { server ->
+                            panel.update { it.withSelected(server.key) }
+                            asterSheet = false
+                        },
+                        recheck = { server -> probes.refresh(listOf(server.address), force = true) },
+                        edit = { server -> editingAster = server?.key ?: NEW_PANEL },
+                        openSheet = { asterSheet = true },
+                        closeSheet = { asterSheet = false },
+                    ),
                 )
             }
         }

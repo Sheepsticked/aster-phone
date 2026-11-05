@@ -28,6 +28,7 @@ class MainActivity : ComponentActivity() {
                 AppRoot(
                     store = app.accountStore,
                     panel = app.asterPanel,
+                    probes = app.asterProbes,
                     requestedTab = requestedTab,
                     onTabHandled = { requestedTab = null },
                     onOpenCall = ::openCall,

@@ -2,14 +2,22 @@ package app.asterphone.ui
 
 import android.app.Application
 import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextReplacement
+import app.asterphone.data.AddedPanel
+import app.asterphone.data.AsterPanelData
+import app.asterphone.data.AsterServer
+import app.asterphone.data.AsterServers
+import app.asterphone.data.SipAccount
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -22,69 +30,119 @@ class AsterPanelScreenTest {
     @get:Rule
     val compose = createComposeRule()
 
-    private var opened: String? = null
-    private var cancelled = false
+    private var saved: String? = null
+    private var closed = false
+    private var removed = false
+    private var defaulted = false
 
-    private fun showAddress(initial: String, cancellable: Boolean = false) {
+    private fun server(host: String = "192.0.2.10", address: String? = null, added: Boolean = false): AsterServer {
+        val accounts = if (added) emptyList() else listOf(SipAccount(id = "a", name = "Office", username = "501", password = "secret", host = host))
+        val data = if (added) AsterPanelData(panels = listOf(AddedPanel("p", address!!))) else AsterPanelData(addresses = address?.let { mapOf(host to it) }.orEmpty())
+        return AsterServers.build(accounts, data).single()
+    }
+
+    private fun show(server: AsterServer?, useDefault: Boolean = false, remove: Boolean = false) {
         compose.setContent {
-            AsterPhoneTheme { AsterAddressScreen(initial, { opened = it }, if (cancellable) ({ cancelled = true }) else null) }
+            AsterPhoneTheme {
+                AsterAddressScreen(
+                    server = server,
+                    onSave = { saved = it },
+                    onUseDefault = if (useDefault) ({ defaulted = true }) else null,
+                    onRemove = if (remove) ({ removed = true }) else null,
+                    onClose = { closed = true },
+                )
+            }
         }
     }
 
     private fun type(text: String) = compose.onNode(hasSetTextAction()).performTextReplacement(text)
 
     @Test
-    fun opensTheSuggestedAddress() {
-        showAddress("http://192.0.2.10/")
+    fun showsTheServersAddressAndSavesIt() {
+        show(server())
+        compose.onNodeWithText("Aster address").assertExists()
         compose.onNodeWithText("http://192.0.2.10/").assertExists()
-        compose.onNodeWithText("Open").performClick()
-        assertEquals("http://192.0.2.10/", opened)
+        compose.onNodeWithText("Save").performClick()
+        assertEquals("http://192.0.2.10/", saved)
     }
 
     @Test
-    fun opensAnAddressWithAPort() {
-        showAddress("")
+    fun savesAnAddressWithAPort() {
+        show(server())
         type(" http://192.0.2.10:5099 ")
-        compose.onNodeWithText("Open").performClick()
-        assertEquals("http://192.0.2.10:5099/", opened)
+        compose.onNodeWithText("Save").performClick()
+        assertEquals("http://192.0.2.10:5099/", saved)
     }
 
     @Test
-    fun opensAnAddressTypedWithoutAScheme() {
-        showAddress("")
+    fun savesAnAddressTypedWithoutAScheme() {
+        show(null)
+        compose.onNodeWithText("Add Aster panel").assertExists()
         type("192.0.2.10:8080")
-        compose.onNodeWithText("Open").performClick()
-        assertEquals("http://192.0.2.10:8080/", opened)
+        compose.onNodeWithText("Add").performClick()
+        assertEquals("http://192.0.2.10:8080/", saved)
+    }
+
+    @Test
+    fun anAddedPanelIsEditedUnderItsOwnTitle() {
+        show(server(address = "http://192.0.2.30:5098/", added = true), remove = true)
+        compose.onNodeWithText("Edit Aster panel").assertExists()
+        compose.onNodeWithText("http://192.0.2.30:5098/").assertExists()
     }
 
     @Test
     fun explainsAnInvalidAddressAndClearsTheMessageOnEdit() {
-        showAddress("")
-        compose.onNodeWithText("Open").performClick()
+        show(null)
+        compose.onNodeWithText("Add").performClick()
         compose.onNodeWithText("Enter the address of Aster").assertExists()
         type("ftp://192.0.2.10/")
         compose.onNodeWithText("Enter the address of Aster").assertDoesNotExist()
-        compose.onNodeWithText("Open").performClick()
+        compose.onNodeWithText("Add").performClick()
         compose.onNodeWithText("Start with http:// or https://").assertExists()
-        assertNull(opened)
+        assertNull(saved)
         type("http://192.0.2.10:99999/")
-        compose.onNodeWithText("Open").performClick()
+        compose.onNodeWithText("Add").performClick()
         compose.onNodeWithText("Port must be between 1 and 65535").assertExists()
-        assertNull(opened)
+        assertNull(saved)
     }
 
     @Test
-    fun cancelIsOnlyOfferedWhenThereIsAnAddressToKeep() {
-        showAddress("http://192.0.2.10/")
-        compose.onNodeWithText("Cancel").assertDoesNotExist()
+    fun goingBackLeavesTheAddressAlone() {
+        show(server())
+        compose.onNodeWithContentDescription("Back").performClick()
+        assertTrue(closed)
+        assertNull(saved)
     }
 
     @Test
-    fun cancelLeavesTheAddressAlone() {
-        showAddress("http://192.0.2.10/", cancellable = true)
+    fun offersTheServersOwnAddressAgainOnlyWhenAskedTo() {
+        show(server(address = "http://192.0.2.10:5099/"))
+        compose.onNodeWithText("Use 192.0.2.10").assertDoesNotExist()
+    }
+
+    @Test
+    fun goesBackToTheServersOwnAddress() {
+        show(server(address = "http://192.0.2.10:5099/"), useDefault = true)
+        compose.onNodeWithText("Use 192.0.2.10").performClick()
+        assertTrue(defaulted)
+    }
+
+    @Test
+    fun removingAPanelAsksFirst() {
+        show(server(address = "http://192.0.2.30:5098/", added = true), remove = true)
+        compose.onNodeWithContentDescription("Remove").performClick()
+        compose.onNodeWithText("Remove 192.0.2.30:5098?").assertExists()
         compose.onNodeWithText("Cancel").performClick()
-        assertEquals(true, cancelled)
-        assertNull(opened)
+        assertFalse(removed)
+        compose.onNodeWithContentDescription("Remove").performClick()
+        compose.onNodeWithText("Remove").performClick()
+        assertTrue(removed)
+    }
+
+    @Test
+    fun aServerHasNothingToRemove() {
+        show(server())
+        compose.onNodeWithContentDescription("Remove").assertDoesNotExist()
     }
 
     @Test
