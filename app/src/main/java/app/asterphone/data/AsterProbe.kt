@@ -17,9 +17,17 @@ object AsterProbe {
     private const val TIMEOUT_MILLIS = 5_000
     private const val MAX_BYTES = 64 * 1024
 
-    /** Aster's answer is HTTP 200 JSON with `versions.controller`; anything else that answered is not Aster. */
-    fun classify(status: Int, body: String?): AsterReach =
-        if (status == HttpURLConnection.HTTP_OK && body != null && hasControllerVersion(body)) AsterReach.Aster else AsterReach.NoAster
+    /**
+     * Aster's answer is HTTP 200 JSON with `versions.controller`. A server error or "too many requests" may pass, so it counts as
+     * unreachable; anything else that answered is not Aster.
+     */
+    fun classify(status: Int, body: String?): AsterReach = when {
+        status == HttpURLConnection.HTTP_OK && body != null && hasControllerVersion(body) -> AsterReach.Aster
+        status >= 500 || status == HTTP_TOO_MANY_REQUESTS -> AsterReach.Unreachable
+        else -> AsterReach.NoAster
+    }
+
+    private const val HTTP_TOO_MANY_REQUESTS = 429
 
     private fun hasControllerVersion(body: String): Boolean = try {
         (JSONObject(body).optJSONObject("versions")?.opt("controller") as? String)?.isNotEmpty() == true

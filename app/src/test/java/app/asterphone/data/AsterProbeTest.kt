@@ -76,8 +76,15 @@ class AsterProbeTest {
 
     @Test
     fun onlyStatus200Counts() {
-        for (status in listOf(201, 204, 301, 302, 401, 403, 404, 500, 503)) {
+        for (status in listOf(201, 204, 301, 302, 401, 403, 404)) {
             assertEquals(status.toString(), AsterReach.NoAster, AsterProbe.classify(status, health))
+        }
+    }
+
+    @Test
+    fun aPassingServerErrorIsUnreachable() {
+        for (status in listOf(429, 500, 502, 503, 504)) {
+            assertEquals(status.toString(), AsterReach.Unreachable, AsterProbe.classify(status, null))
         }
     }
 
