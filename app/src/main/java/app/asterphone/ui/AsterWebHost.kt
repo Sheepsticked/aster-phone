@@ -165,6 +165,9 @@ class AsterWebHost(private val context: Context, resumeUrl: String?) {
     @SuppressLint("SetJavaScriptEnabled")
     private fun newView(address: AddressCheck.Valid): WebView {
         val view = WebView(context)
+        // Without layout parameters a view added by Compose counts as wrap-content, and the web view then gives the page a layout
+        // height of zero: vh, dvh and height media queries all come out as 0.
+        view.layoutParams = ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
         view.setBackgroundColor(Color.TRANSPARENT)
         view.settings.apply {
             // The panel is a script-driven page that keeps its theme in local storage.

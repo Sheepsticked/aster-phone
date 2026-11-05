@@ -25,6 +25,7 @@ android {
         targetSdk = 36
         versionCode = 13
         versionName = "0.7.1"
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         // The SIP library ships native code for four ABIs; current phones only need arm64.
         ndk { abiFilters += "arm64-v8a" }
@@ -107,6 +108,11 @@ dependencies {
     testImplementation(libs.robolectric)
     testImplementation(platform(libs.androidx.compose.bom))
     testImplementation(libs.androidx.compose.ui.test.junit4)
+    // Tests that run on a device or emulator, where a real web view is available.
+    androidTestImplementation(libs.androidx.test.ext.junit)
+    androidTestImplementation(libs.androidx.test.runner)
+    androidTestImplementation(platform(libs.androidx.compose.bom))
+    androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     // Registers the empty activity that Compose UI tests render into.
     debugImplementation(libs.androidx.compose.ui.test.manifest)
 }
