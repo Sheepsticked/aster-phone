@@ -3,6 +3,17 @@
 A small Android SIP softphone for one self-hosted Asterisk server, such as an Asterisk-based GSM gateway,
 reached over a LAN or a VPN.
 
+It has extra support for Aster, an Asterisk-based GSM gateway with a web panel for its phones and GSM modems:
+the app can show that panel and tell which SIM a call goes out through. Without an Aster it works as a plain
+SIP softphone.
+
+<p align="center">
+  <img src="docs/screenshots/dialer-sim-ready.png" alt="Dialer with the selected account, the SIM line and the keypad" width="200">
+  <img src="docs/screenshots/call-incoming.png" alt="Incoming call with Decline and Answer buttons" width="200">
+  <img src="docs/screenshots/call-connected.png" alt="Call in progress in the dark theme, with mute, speaker, keypad and hold" width="200">
+  <img src="docs/screenshots/accounts.png" alt="List of SIP accounts with their registration status" width="200">
+</p>
+
 - Several SIP accounts at once, each with its own registration status. The dialer shows the account calls go
   through at the top; tapping it opens a scrollable list of all accounts, and the choice is remembered.
   Holding an account in that list opens its settings
@@ -15,26 +26,46 @@ reached over a LAN or a VPN.
   next to Call opens the phone's contact picker. Contacts are read on the phone only and never sent anywhere
 - Call history: tapping an entry puts its number in the dialer, with the account it used when that is still on;
   the phone icon calls back at once through the same account
-- An Aster tab shows the Aster web panel inside the app. Every SIP server of your accounts is looked at for an
-  Aster on its plain web port (`api/health`); a bar at the top of the tab names the one shown, and tapping it
-  opens a list of the Aster servers, the servers with none (greyed, with "Set address" for a panel on another
-  address) and "Add Aster panel" for one that no account points at. Each server keeps its own page and back
-  history, and its own login unless two panels share a host and differ only by port, as web views keep
-  cookies by host. The tab only loads the chosen panel's address (plain HTTP is allowed for it) and opens
-  other links in the browser; you sign in on the panel's own page and the app never stores the password. The
-  page is closed whenever the app is in the background or another panel is chosen, and comes back with its
-  back history. An address typed without `http://` or `https://` is taken as `http://`. The Setup tab counts
-  the Aster panels found and opens the list
-- When the selected account is a phone of the Aster on its own server, the dialer shows one line under the
-  account bar: the modem its calls go out through, in red when the modem isn't ready, or that calls stay
-  internal. Tapping it opens that page in the Aster tab. The line comes from Aster's phones and modems lists,
-  read with the panel's login cookie while the dialer is on screen; without a login or on any error it isn't
-  shown
+- An Aster tab with the Aster web panel, and a dialer line with the SIM the selected account calls out
+  through. See [Aster tab](#aster-tab)
 - A setup checklist for the Android and Samsung battery settings that would otherwise stop background calls
+
+<p align="center">
+  <img src="docs/screenshots/recents-dark.png" alt="Call history grouped by day, in the dark theme" width="200">
+  <img src="docs/screenshots/setup.png" alt="Setup checklist with one background setting that needs attention" width="200">
+</p>
 
 Calls use G.711 (PCMA/PCMU) over UDP or TCP. TLS, video and messaging are out of scope.
 
 The launcher icon is the Aster logo, the same mark as the Aster web interface.
+
+## Install
+
+There is no prebuilt APK. Build the app from source as described under [Building](#building), then install
+`app/build/outputs/apk/debug/app-debug.apk` with `adb install` or copy it to the phone. The app needs Android 10
+or newer on a 64-bit ARM phone.
+
+## Aster tab
+
+The tab shows the Aster web panel inside the app.
+
+- Every SIP server of your accounts is looked at for an Aster on its plain web port (`api/health`). A bar at
+  the top of the tab names the panel shown. Tapping it opens a list of the Aster servers, the servers with
+  none (greyed, with "Set address" for a panel on another address) and "Add Aster panel" for a panel that no
+  account points at.
+- Each server keeps its own page and back history, and its own login, unless two panels share a host and
+  differ only by port, as web views keep cookies by host.
+- The tab only loads the chosen panel's address (plain HTTP is allowed for it) and opens other links in the
+  browser. An address typed without `http://` or `https://` is taken as `http://`.
+- You sign in on the panel's own page and the app never stores the password. The page is closed whenever the
+  app is in the background or another panel is chosen, and comes back with its back history.
+- The Setup tab counts the Aster panels found and opens the list.
+
+When the selected account is a phone of the Aster on its own server, the dialer shows one line under the
+account bar: the modem its calls go out through, in red when the modem isn't ready, or that calls stay
+internal. Tapping it opens that page in the Aster tab. The line comes from Aster's phones and modems lists,
+read with the panel's login cookie while the dialer is on screen. Without a login, or on any error, it isn't
+shown.
 
 ## How it stays reachable
 
@@ -61,8 +92,9 @@ echo "sdk.dir=$HOME/Android/Sdk" > local.properties
 
 The APK is written to `app/build/outputs/apk/debug/`. The debug build installs next to the release app and has
 a blue launcher icon, so the two can be told apart. The unit tests include Compose UI tests that run on the
-JVM through Robolectric and save a PNG of every screen to `app/build/screenshots/`. The web view's layout is
-checked by an instrumented test, which needs a device or emulator: `./gradlew connectedDebugAndroidTest`.
+JVM through Robolectric and save a PNG of every screen to `app/build/screenshots/`; the images in
+`docs/screenshots/` are copies of some of them. The web view's layout is checked by an instrumented test,
+which needs a device or emulator: `./gradlew connectedDebugAndroidTest`.
 
 Release builds are signed when a properties file exists at `~/.android-keys/asterphone-signing.properties`
 (or the path given with `-Pasterphone.signing=...`) containing `storeFile`, `storePassword`, `keyAlias` and
@@ -84,7 +116,7 @@ Release builds are signed when a properties file exists at `~/.android-keys/aste
 
 - Each phone ping from Asterisk (`qualify_frequency` on the AOR) and each TCP keepalive
   (`keep_alive_interval` in `[global]`) wakes the phone. Intervals of a few minutes are kinder to the battery
-  than the 30–60 s often used on desk phones.
+  than the 30 to 60 s often used on desk phones.
 - The account's "Re-register every" setting defaults to 600 seconds. Longer values save battery; network
   changes don't wait for it.
 - To use TCP, the server needs a TCP transport, for example:
