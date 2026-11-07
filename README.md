@@ -63,9 +63,9 @@ The launcher icon is the Aster logo, the same mark as the Aster web interface.
 
 ## Install
 
-There is no prebuilt APK. Build the app from source as described under [Building](#building), then install
-`app/build/outputs/apk/debug/app-debug.apk` with `adb install` or copy it to the phone. The app needs Android 10
-or newer on a 64-bit ARM phone.
+Download the APK from the [latest release](https://github.com/Sheepsticked/aster-phone/releases/latest) and open
+it on the phone, allowing installs from that source when Android asks. Or build it from source as described under
+[Building](#building). The app needs Android 10 or newer on a 64-bit ARM phone.
 
 ## Aster tab
 
