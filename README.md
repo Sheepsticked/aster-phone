@@ -8,11 +8,38 @@ the app can show that panel and tell which SIM a call goes out through. Without 
 SIP softphone.
 
 <p align="center">
-  <img src="docs/screenshots/dialer-sim-ready.png" alt="Dialer with the selected account, the SIM line and the keypad" width="200">
-  <img src="docs/screenshots/call-incoming.png" alt="Incoming call with Decline and Answer buttons" width="200">
-  <img src="docs/screenshots/call-connected.png" alt="Call in progress in the dark theme, with mute, speaker, keypad and hold" width="200">
-  <img src="docs/screenshots/accounts.png" alt="List of SIP accounts with their registration status" width="200">
+  <img src="docs/screenshots/dialer-sim-ready.png" alt="Dialer with the selected account, the SIM line and the keypad" width="280">
 </p>
+
+<details>
+<summary>Incoming call</summary>
+
+<img src="docs/screenshots/call-incoming.png" alt="Incoming call with Decline and Answer buttons" width="280">
+</details>
+
+<details>
+<summary>In a call</summary>
+
+<img src="docs/screenshots/call-connected.png" alt="Call in progress in the dark theme, with mute, speaker, keypad and hold" width="280">
+</details>
+
+<details>
+<summary>Accounts</summary>
+
+<img src="docs/screenshots/accounts.png" alt="List of SIP accounts with their registration status" width="280">
+</details>
+
+<details>
+<summary>Call history (dark theme)</summary>
+
+<img src="docs/screenshots/recents-dark.png" alt="Call history grouped by day, in the dark theme" width="280">
+</details>
+
+<details>
+<summary>Setup checklist</summary>
+
+<img src="docs/screenshots/setup.png" alt="Setup checklist with one background setting that needs attention" width="280">
+</details>
 
 - Several SIP accounts at once, each with its own registration status. The dialer shows the account calls go
   through at the top; tapping it opens a scrollable list of all accounts, and the choice is remembered.
@@ -29,11 +56,6 @@ SIP softphone.
 - An Aster tab with the Aster web panel, and a dialer line with the SIM the selected account calls out
   through. See [Aster tab](#aster-tab)
 - A setup checklist for the Android and Samsung battery settings that would otherwise stop background calls
-
-<p align="center">
-  <img src="docs/screenshots/recents-dark.png" alt="Call history grouped by day, in the dark theme" width="200">
-  <img src="docs/screenshots/setup.png" alt="Setup checklist with one background setting that needs attention" width="200">
-</p>
 
 Calls use G.711 (PCMA/PCMU) over UDP or TCP. TLS, video and messaging are out of scope.
 
