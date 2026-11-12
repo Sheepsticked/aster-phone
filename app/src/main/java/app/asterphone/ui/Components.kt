@@ -3,7 +3,6 @@ package app.asterphone.ui
 import android.icu.text.MeasureFormat
 import android.icu.util.Measure
 import android.icu.util.MeasureUnit
-import android.icu.util.ULocale
 import android.os.SystemClock
 import android.view.HapticFeedbackConstants
 import android.view.View
@@ -40,7 +39,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
@@ -256,21 +254,9 @@ fun RoundToggle(label: String, @DrawableRes icon: Int, checked: Boolean, onToggl
 }
 
 private val KEYS = listOf("123", "456", "789", "*0#")
-private val LETTERS = mapOf(
-    '2' to "ABC", '3' to "DEF", '4' to "GHI", '5' to "JKL",
-    '6' to "MNO", '7' to "PQRS", '8' to "TUV", '9' to "WXYZ",
-)
-private val CYRILLIC_LETTERS = mapOf(
-    '2' to "АБВГ", '3' to "ДЕЖЗ", '4' to "ИЙКЛ", '5' to "МНОП",
-    '6' to "РСТУ", '7' to "ФХЦЧ", '8' to "ШЩЪЫ", '9' to "ЬЭЮЯ",
-)
-
 /** Phone keypad used by the dialer and for in-call tones. With [allowPlus], holding 0 types "+". */
 @Composable
 fun DialPad(onKey: (Char) -> Unit, modifier: Modifier = Modifier, allowPlus: Boolean = false, keySize: Dp = 72.dp) {
-    // Phones in Cyrillic-script languages print both alphabets; small keys have room for one line only.
-    val locale = LocalConfiguration.current.locales[0]
-    val cyrillic = remember(locale) { ULocale.addLikelySubtags(ULocale.forLocale(locale)).script == "Cyrl" } && keySize >= 64.dp
     val haptics = rememberHaptics()
     Column(modifier, verticalArrangement = Arrangement.spacedBy(keySize * 0.18f)) {
         for (row in KEYS) {
@@ -279,8 +265,7 @@ fun DialPad(onKey: (Char) -> Unit, modifier: Modifier = Modifier, allowPlus: Boo
                     val plus = allowPlus && key == '0'
                     DialKey(
                         key = key,
-                        letters = if (plus) "+" else LETTERS[key].orEmpty(),
-                        secondLetters = if (cyrillic) CYRILLIC_LETTERS[key].orEmpty() else "",
+                        label = if (plus) "+" else "",
                         size = keySize,
                         onClick = {
                             haptics.tap()
@@ -300,8 +285,7 @@ fun DialPad(onKey: (Char) -> Unit, modifier: Modifier = Modifier, allowPlus: Boo
 @Composable
 private fun DialKey(
     key: Char,
-    letters: String,
-    secondLetters: String,
+    label: String,
     size: Dp,
     onClick: () -> Unit,
     onLongClick: (() -> Unit)?,
@@ -316,16 +300,17 @@ private fun DialKey(
             .testTag("key-$key"),
         contentAlignment = Alignment.Center,
     ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            val digitStyle = if (size >= 64.dp) MaterialTheme.typography.headlineMedium else MaterialTheme.typography.headlineSmall
-            Text(key.toString(), style = digitStyle, color = MaterialTheme.colorScheme.onSurface)
-            val letterStyle = MaterialTheme.typography.labelSmall.let { it.copy(lineHeight = it.fontSize * 1.1f) }
-            if (letters.isNotEmpty()) {
-                Text(letters, style = letterStyle, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-            if (secondLetters.isNotEmpty()) {
-                Text(secondLetters, style = letterStyle, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
+        val digitStyle = if (size >= 64.dp) MaterialTheme.typography.headlineMedium else MaterialTheme.typography.headlineSmall
+        Text(key.toString(), style = digitStyle, color = MaterialTheme.colorScheme.onSurface)
+        // The label sits near the bottom edge so the digit stays in the middle, as on keys without one.
+        if (label.isNotEmpty()) {
+            val labelStyle = MaterialTheme.typography.labelSmall.let { it.copy(lineHeight = it.fontSize * 1.1f) }
+            Text(
+                label,
+                style = labelStyle,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = size * 0.08f),
+            )
         }
     }
 }

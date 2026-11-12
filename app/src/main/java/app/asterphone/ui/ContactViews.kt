@@ -67,7 +67,7 @@ fun ContactSuggestion(match: ContactMatch, more: Int, onPick: () -> Unit, onMore
             Avatar(match.contact.name, 40.dp)
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
-                Text(name(match), style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(match.contact.name, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text(
                     numberLine(match),
                     style = MaterialTheme.typography.bodyMedium,
@@ -121,7 +121,7 @@ fun ContactMatchesSheet(matches: List<ContactMatch>, onPick: (PhoneContact) -> U
                         .testTag("contact-$index"),
                     colors = transparent,
                     leadingContent = { Avatar(match.contact.name, 40.dp) },
-                    headlineContent = { Text(name(match), maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                    headlineContent = { Text(match.contact.name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                     supportingContent = { Text(numberLine(match), maxLines = 1, overflow = TextOverflow.Ellipsis) },
                 )
             }
@@ -131,9 +131,6 @@ fun ContactMatchesSheet(matches: List<ContactMatch>, onPick: (PhoneContact) -> U
 
 @Composable
 private fun highlight() = SpanStyle(color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
-
-@Composable
-private fun name(match: ContactMatch): AnnotatedString = highlighted(match.contact.name, match.nameRange, highlight())
 
 /** "+1 234… · Mobile", with the typed digits picked out; the label comes last so a long line cuts it, not the digits. */
 @Composable

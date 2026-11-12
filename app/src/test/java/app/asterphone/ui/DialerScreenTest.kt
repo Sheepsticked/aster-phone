@@ -6,12 +6,14 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.hasParent
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createComposeRule
@@ -301,10 +303,35 @@ class DialerScreenTest {
     }
 
     @Test
-    fun keypadLettersFindContactsByName() {
-        show(contacts = Samples.contacts)
+    fun contactsAreSuggestedByNumberOnly() {
+        show(contacts = ContactDirectory(listOf(PhoneContact("Bob Jones", "+1 555 0100"))))
+        // 5663 spells "Jone" on keypad letters but is not in the number.
         press("5663")
+        compose.onNodeWithTag("suggestion").assertDoesNotExist()
+        compose.onNodeWithContentDescription("Delete").performTouchInput { longClick() }
+        press("0100")
         compose.onNodeWithTag("suggestion").assert(hasText("Bob Jones", substring = true))
+        val number = compose.onNodeWithTag("suggestion").fetchSemanticsNode().config[SemanticsProperties.Text]
+            .first { it.text.startsWith("+1 555 0100") }
+        assertEquals(listOf("0100"), number.spanStyles.map { number.text.substring(it.start, it.end) })
+    }
+
+    @Test
+    fun keysShowDigitsAndPlusOnly() {
+        show()
+        listOf("ABC", "WXYZ", "АБВГ").forEach { compose.onNodeWithText(it, substring = true).assertDoesNotExist() }
+        compose.onNodeWithText("+").assertExists()
+    }
+
+    @Test
+    fun digitsSitInTheMiddleOfTheirKeys() {
+        show()
+        for (key in "1250#") {
+            val box = compose.onNodeWithTag("key-$key").fetchSemanticsNode().boundsInRoot
+            val digit = compose.onNode(hasText("$key") and hasParent(hasTestTag("key-$key")), useUnmergedTree = true)
+                .fetchSemanticsNode().boundsInRoot
+            assertTrue("key $key", kotlin.math.abs(digit.center.y - box.center.y) < 1f)
+        }
     }
 
     @Test

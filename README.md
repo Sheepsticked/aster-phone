@@ -49,7 +49,7 @@ SIP softphone.
 - Calls are registered with Android's Telecom service: answering a mobile call puts the SIP call on hold,
   and Bluetooth headsets, watches and cars can answer or end it
 - Names from the phone's contacts on calls, notifications and call history. While a number is typed, the
-  dialer suggests matching contacts by number or by name spelled on the keypad letters; the Contacts button
+  dialer suggests contacts whose number contains the typed digits; the Contacts button
   next to Call opens the phone's contact picker. Contacts are read on the phone only and never sent anywhere
 - Call history: tapping an entry puts its number in the dialer, with the account it used when that is still on;
   the phone icon calls back at once through the same account

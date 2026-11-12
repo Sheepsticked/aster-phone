@@ -39,21 +39,19 @@ class ContactsTest {
     }
 
     @Test
-    fun namesMatchOnTheKeypadFromTheStartOfAnyWord() {
-        // J-O-N-E = 5-6-6-3
-        val match = directory.search("5663").single()
-        assertEquals("Bob Jones", match.contact.name)
-        assertEquals(4..7, match.nameRange)
-        assertNull(match.numberRange)
-        assertEquals(listOf("Alice Smith"), names("76484"))
+    fun digitsSpellingANameOnTheKeypadFindNothing() {
+        // J-O-N-E = 5-6-6-3, A-L-I-C-E = 2-5-4-2-3; neither number contains these digits.
+        assertTrue(directory.search("5663").isEmpty())
+        assertTrue(directory.search("25423").isEmpty())
     }
 
     @Test
-    fun accentsAndCyrillicLettersHaveKeys() {
-        val contacts = ContactDirectory(listOf(PhoneContact("José", "+1234567890"), PhoneContact("Анна", "+1234567891")))
-        assertEquals(listOf("José"), contacts.search("5673").map { it.contact.name })
-        // А-Н-Н-А = 2-5-5-2
-        assertEquals(listOf("Анна"), contacts.search("2552").map { it.contact.name })
+    fun anExactNumberComesFirstThenTheStartThenTheMiddle() {
+        val middle = PhoneContact("Middle", "+1 555 0100")
+        val start = PhoneContact("Start", "0100 2345")
+        val exact = PhoneContact("Exact", "01 00")
+        val contacts = ContactDirectory(listOf(middle, start, exact))
+        assertEquals(listOf("Exact", "Start", "Middle"), contacts.search("0100").map { it.contact.name })
     }
 
     @Test

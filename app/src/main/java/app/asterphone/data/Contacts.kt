@@ -1,17 +1,14 @@
 package app.asterphone.data
 
-import java.text.Normalizer
-
 /** A phone number from the phone's contacts. [type] is its label, such as "Mobile". */
 data class PhoneContact(val name: String, val number: String, val type: String = "") {
     internal val digits: String = number.filter { it.isDigit() }
-    internal val keypadWords: List<Pair<Int, String>> = keypadWords(name)
 }
 
-/** A contact matching the typed digits. The ranges mark the matching characters of its name and number. */
-data class ContactMatch(val contact: PhoneContact, val nameRange: IntRange? = null, val numberRange: IntRange? = null)
+/** A contact matching the typed digits. [numberRange] marks the matching characters of its number. */
+data class ContactMatch(val contact: PhoneContact, val numberRange: IntRange? = null)
 
-/** The phone's contacts, searchable by number or by name on the keypad, and by caller number. */
+/** The phone's contacts, searchable by the digits of their number and by caller number. */
 class ContactDirectory(val contacts: List<PhoneContact>) {
     // Contacts by the last digits of their number, to find a caller without scanning every contact.
     private val byTail: Map<String, List<PhoneContact>> = contacts.groupBy { it.digits.takeLast(MIN_MATCH) }
@@ -24,8 +21,8 @@ class ContactDirectory(val contacts: List<PhoneContact>) {
     }
 
     /**
-     * Contacts whose number contains the digits of [typed], or with a word of the name that starts with them
-     * on the keypad. Number matches from the start come first, then name matches, then the rest.
+     * Contacts whose number contains the digits of [typed]: an exact number first, then numbers that start
+     * with the digits, then the rest.
      */
     fun search(typed: String): List<ContactMatch> {
         val query = typed.filter { it.isDigit() }
@@ -34,18 +31,13 @@ class ContactDirectory(val contacts: List<PhoneContact>) {
     }
 
     private fun rank(contact: PhoneContact, query: String): Pair<Int, ContactMatch>? {
-        val number = numberMatch(contact, query)
-        val name = contact.keypadWords.firstNotNullOfOrNull { (start, keys) ->
-            if (keys.startsWith(query)) start until start + query.length else null
-        }
-        if (number == null && name == null) return null
+        val number = numberMatch(contact, query) ?: return null
         val rank = when {
             contact.digits == query -> 0
-            number != null && number.atStart -> 1
-            name != null -> 2
-            else -> 3
+            number.atStart -> 1
+            else -> 2
         }
-        return rank to ContactMatch(contact, name, number?.let { contact.numberChars(it.from, it.length) })
+        return rank to ContactMatch(contact, contact.numberChars(number.from, number.length))
     }
 
     private class NumberHit(val from: Int, val length: Int, val atStart: Boolean)
@@ -94,39 +86,4 @@ class ContactDirectory(val contacts: List<PhoneContact>) {
 private fun PhoneContact.numberChars(from: Int, length: Int): IntRange {
     val positions = number.indices.filter { number[it].isDigit() }
     return positions[from]..positions[from + length - 1]
-}
-
-// The keypad digit of each letter: Latin as printed on phone keypads, and the Cyrillic layout used on phones
-// sold where Cyrillic script is used.
-private val KEYPAD: Map<Char, Char> = buildMap {
-    listOf("abc", "def", "ghi", "jkl", "mno", "pqrs", "tuv", "wxyz").forEachIndexed { i, letters ->
-        letters.forEach { put(it, '2' + i) }
-    }
-    listOf("абвгґ", "деёєжз", "иіїйкл", "мноп", "рстуў", "фхцч", "шщъы", "ьэюя").forEachIndexed { i, letters ->
-        letters.forEach { put(it, '2' + i) }
-    }
-}
-
-/** The digit typed for [c] on a phone keypad, or null for characters that have none. */
-internal fun keypadDigit(c: Char): Char? {
-    if (c.isDigit()) return c
-    val lower = c.lowercaseChar()
-    KEYPAD[lower]?.let { return it }
-    // Letters with accents are typed as their base letter.
-    val base = Normalizer.normalize(lower.toString(), Normalizer.Form.NFD).firstOrNull() ?: return null
-    return KEYPAD[base]
-}
-
-/** Each word of [name] with its start index and its keypad digits; a letter without a key stops the digits there. */
-private fun keypadWords(name: String): List<Pair<Int, String>> = buildList {
-    var start = -1
-    for (i in 0..name.length) {
-        val inWord = i < name.length && name[i].isLetterOrDigit()
-        if (inWord && start < 0) start = i
-        if (!inWord && start >= 0) {
-            val keys = name.substring(start, i).map { keypadDigit(it) }.takeWhile { it != null }.joinToString("")
-            if (keys.isNotEmpty()) add(start to keys)
-            start = -1
-        }
-    }
 }

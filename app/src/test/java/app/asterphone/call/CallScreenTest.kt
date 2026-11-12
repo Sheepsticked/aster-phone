@@ -6,6 +6,9 @@ import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.longClick
+import androidx.compose.ui.test.assertAll
+import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.onChildren
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
@@ -84,6 +87,8 @@ class CallScreenTest {
         compose.onNodeWithTag("key-0").performTouchInput { longClick() }
         assertEquals(listOf("dtmf=1", "dtmf=2", "dtmf=#", "dtmf=0"), events)
         compose.onNodeWithText("12#0").assertExists()
+        listOf("ABC", "WXYZ").forEach { compose.onNodeWithText(it, substring = true).assertDoesNotExist() }
+        compose.onNodeWithTag("key-0", useUnmergedTree = true).onChildren().assertAll(hasText("0"))
     }
 
     @Test
